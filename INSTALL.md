@@ -1,6 +1,9 @@
 # 第一次安装 Gauge
 
-Gauge 是一个 Codex 插件，用来查看你在本机使用 Codex 时的 tokens、用量趋势和费用估算。
+Gauge 是运行在 **Codex Mac 桌面端侧边栏**的插件，核心功能是：
+
+- 查看每轮对话的 tokens 和 API 等价费用，回看历史轮次、累计消耗和趋势。
+- 给当前对话设置预算，查看生效后的已用、剩余或超支金额。预算默认关闭，按需开启。
 
 **这份说明从你还没有下载、安装 Gauge 开始。下载和安装交给 Codex 完成。**
 
@@ -31,9 +34,22 @@ Codex 确认安装成功后，新开一个聊天，发送：
 
 若仍未出现面板，让 Codex 检查 Gauge 是否已启用；如果客户端提示需要重新打开，请保存当前工作后重新打开客户端，再试一次。
 
-看到 Gauge 面板后，可以先看「对话」或「账号」。全新对话没有用量记录时会显示等待状态，正常使用 Codex 后会自动更新。预算默认关闭，查看用量无需设置预算。
+面板会在 Codex Mac 桌面端的侧边栏打开：
+
+- 先看「对话 → 轮次」，这里显示每轮 tokens、API 等价费用及费用拆分，可以选择历史轮次回看。
+- 想给这段对话设预算，进入「预算」，开启预算、填写金额并保存，再查看已用和剩余。
+
+全新对话没有用量记录时会显示等待状态，正常使用 Codex 后会自动更新。查看费用无需开启预算；预算是软提醒，不会硬性中断对话。
 
 面板中的金额是按 API 价格估算的等价费用，不会因此向你额外扣费。
+
+## 界面截图
+
+截图使用演示数据，预算图为手动开启后的示例；新安装默认关闭预算。
+
+| 每轮对话的费用与 tokens | 对话预算：已用与剩余 | 设置对话预算 |
+| --- | --- | --- |
+| <a href="https://raw.githubusercontent.com/DHCFE/gauge-codex-plugin/main/docs/images/round-usage.png"><img src="https://raw.githubusercontent.com/DHCFE/gauge-codex-plugin/main/docs/images/round-usage.png" width="280" alt="Gauge 单轮 API 等价费用与 tokens"></a> | <a href="https://raw.githubusercontent.com/DHCFE/gauge-codex-plugin/main/docs/images/conversation-budget.png"><img src="https://raw.githubusercontent.com/DHCFE/gauge-codex-plugin/main/docs/images/conversation-budget.png" width="280" alt="Gauge 对话预算已用与剩余"></a> | <a href="https://raw.githubusercontent.com/DHCFE/gauge-codex-plugin/main/docs/images/budget-setup.png"><img src="https://raw.githubusercontent.com/DHCFE/gauge-codex-plugin/main/docs/images/budget-setup.png" width="280" alt="Gauge 对话预算设置"></a> |
 
 ## 想自己下载安装
 
