@@ -36,4 +36,20 @@ if [ "${1:-}" = "--budget-hook" ]; then
   shift
   exec "$NODE" "$ROOT/budget-hook.mjs" "$@"
 fi
+# Match the user's existing macOS network settings for public release checks.
+# This only configures this child process; system and Codex settings are untouched.
+if [ -z "${HTTPS_PROXY:-${https_proxy:-}}" ]; then
+  SETTINGS=$(/usr/sbin/scutil --proxy)
+  ENABLED=$(printf '%s\n' "$SETTINGS" | /usr/bin/awk '$1=="HTTPSEnable" {print $3}')
+  PROXY_HOST=$(printf '%s\n' "$SETTINGS" | /usr/bin/awk '$1=="HTTPSProxy" {print $3}')
+  PROXY_PORT=$(printf '%s\n' "$SETTINGS" | /usr/bin/awk '$1=="HTTPSPort" {print $3}')
+  if [ "$ENABLED" = 1 ] && [ -n "$PROXY_HOST" ] && [ -n "$PROXY_PORT" ]; then
+    case "$PROXY_HOST" in *:*) PROXY_HOST="[$PROXY_HOST]" ;; esac
+    HTTPS_PROXY="http://$PROXY_HOST:$PROXY_PORT"
+    export HTTPS_PROXY
+  fi
+fi
+if [ -n "${HTTPS_PROXY:-${https_proxy:-}}" ] || [ -n "${HTTP_PROXY:-${http_proxy:-}}" ]; then
+  exec "$NODE" --use-env-proxy "$ROOT/server.mjs" "$@"
+fi
 exec "$NODE" "$ROOT/server.mjs" "$@"

@@ -38885,7 +38885,7 @@ async function readCodexAppServer({
     });
   }
   try {
-    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.5" }, capabilities: { experimentalApi: true } });
+    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.6" }, capabilities: { experimentalApi: true } });
     child.stdin.write(JSON.stringify({ method: "initialized" }) + "\n");
     const auth = await call("account/read", { refreshToken: false });
     if (!auth?.account || auth.account.type !== "chatgpt") return {
@@ -40108,7 +40108,7 @@ function compareVersions(a, b) {
   for (let i = 0; i < 3; i++) if (left[i] !== right[i]) return Math.sign(left[i] - right[i]);
   return 0;
 }
-function createUpdateService({ repository, currentVersion, dataDir, fetchImpl = fetch, now = Date.now, timeoutMs = 5e3 } = {}) {
+function createUpdateService({ repository, currentVersion, dataDir, fetchImpl = fetch, now = Date.now, timeoutMs = 1e4 } = {}) {
   compareVersions(currentVersion, currentVersion);
   const configured = typeof repository === "string" && /^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(repository);
   const origin = configured ? `https://github.com/${repository}` : null;
@@ -40158,7 +40158,7 @@ function createUpdateService({ repository, currentVersion, dataDir, fetchImpl = 
   async function check2() {
     if (!configured) return { status: "unconfigured", currentVersion };
     const cached2 = memory || readCache();
-    if (cached2 && now() - cached2.checkedAt < 6 * 60 * 6e4) return view(cached2);
+    if (cached2 && compareVersions(cached2.manifest.version, currentVersion) >= 0 && now() - cached2.checkedAt < 6 * 60 * 6e4) return view(cached2);
     if (now() - lastFailureAt < 15 * 6e4) return cached2 ? view(cached2, true) : { status: "unavailable", currentVersion };
     if (pending2) return pending2;
     pending2 = (async () => {
@@ -40195,11 +40195,11 @@ function createUpdateService({ repository, currentVersion, dataDir, fetchImpl = 
 }
 
 // src/server.mjs
-var APP_URI = "ui://tokenlens/live-v3-0.5.5.html";
+var APP_URI = "ui://tokenlens/live-v3-0.5.6.html";
 var icon = readFileSync3(new URL("./assets/icon.svg", import.meta.url), "utf8");
 var panelSnapshot = createPanelSnapshot({ dataDir: pluginDataDir() });
 var updateConfig = JSON.parse(readFileSync3(new URL("./data/release.json", import.meta.url), "utf8"));
-var updates = createUpdateService({ ...updateConfig, currentVersion: "0.5.5", dataDir: pluginDataDir() });
+var updates = createUpdateService({ ...updateConfig, currentVersion: "0.5.6", dataDir: pluginDataDir() });
 var integration = createIntegration({
   readAccount: (request) => readTelemetry("account", request),
   readThread: (thread_id) => readTelemetry("thread", { thread_id }),
@@ -40245,7 +40245,7 @@ function openPanel(args, extra) {
   };
 }
 function createMcpServer() {
-  const server = new McpServer({ name: "tokenlens", title: "Gauge", version: "0.5.5", icons: [{ src: `data:image/svg+xml,${encodeURIComponent(icon)}`, mimeType: "image/svg+xml", sizes: ["any"] }] });
+  const server = new McpServer({ name: "tokenlens", title: "Gauge", version: "0.5.6", icons: [{ src: `data:image/svg+xml,${encodeURIComponent(icon)}`, mimeType: "image/svg+xml", sizes: ["any"] }] });
   G(server, "tokenlens-ui", APP_URI, {}, async () => ({ contents: [{
     uri: APP_URI,
     mimeType: L,

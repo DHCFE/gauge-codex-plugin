@@ -158,7 +158,7 @@ async function readCodexAppServer({
     });
   }
   try {
-    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.5" }, capabilities: { experimentalApi: true } });
+    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.6" }, capabilities: { experimentalApi: true } });
     child.stdin.write(JSON.stringify({ method: "initialized" }) + "\n");
     const auth = await call("account/read", { refreshToken: false });
     if (!auth?.account || auth.account.type !== "chatgpt") return {

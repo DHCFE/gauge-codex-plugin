@@ -7,6 +7,16 @@ if [[ "$(/usr/bin/uname -s)" != Darwin || "$(/usr/bin/uname -m)" != arm64 ]]; th
   echo "Gauge 当前支持 Apple Silicon Mac。" >&2
   exit 1
 fi
+if [[ -z "${HTTPS_PROXY:-${https_proxy:-}}" ]]; then
+  SETTINGS=$(/usr/sbin/scutil --proxy)
+  ENABLED=$(printf '%s\n' "$SETTINGS" | /usr/bin/awk '$1=="HTTPSEnable" {print $3}')
+  PROXY_HOST=$(printf '%s\n' "$SETTINGS" | /usr/bin/awk '$1=="HTTPSProxy" {print $3}')
+  PROXY_PORT=$(printf '%s\n' "$SETTINGS" | /usr/bin/awk '$1=="HTTPSPort" {print $3}')
+  if [[ "$ENABLED" == 1 && -n "$PROXY_HOST" && -n "$PROXY_PORT" ]]; then
+    if [[ "$PROXY_HOST" == *:* ]]; then PROXY_HOST="[$PROXY_HOST]"; fi
+    export HTTPS_PROXY="http://$PROXY_HOST:$PROXY_PORT"
+  fi
+fi
 TASK_TMP=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/gauge-install.XXXXXX")
 trap '/bin/rm -rf "$TASK_TMP"' EXIT
 download() {
