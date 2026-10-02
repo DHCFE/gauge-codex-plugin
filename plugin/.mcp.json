@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "tokenlens": {
+      "command": "/bin/sh",
+      "args": [
+        "./bin/launch.sh"
+      ],
+      "cwd": "."
+    }
+  }
+}

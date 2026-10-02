@@ -1,0 +1,9 @@
+{
+  "description": "Optional per-conversation Gauge budgets. Disabled budgets return no context; never blocks or starts another turn.",
+  "hooks": {
+    "SessionStart": [{"matcher": "startup|resume|clear|compact", "hooks": [{"type": "command", "command": "/bin/sh \"${PLUGIN_ROOT}/bin/launch.sh\" --budget-hook", "additionalContextLimit": 600}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "/bin/sh \"${PLUGIN_ROOT}/bin/launch.sh\" --budget-hook", "additionalContextLimit": 600}]}],
+    "SubagentStart": [{"hooks": [{"type": "command", "command": "/bin/sh \"${PLUGIN_ROOT}/bin/launch.sh\" --budget-hook", "additionalContextLimit": 600}]}],
+    "PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "/bin/sh \"${PLUGIN_ROOT}/bin/launch.sh\" --budget-hook", "additionalContextLimit": 600}]}]
+  }
+}

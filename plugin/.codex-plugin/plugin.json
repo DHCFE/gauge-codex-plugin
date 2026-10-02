@@ -1,0 +1,24 @@
+{
+  "name": "tokenlens-prototype",
+  "version": "0.5.5",
+  "description": "Local Codex usage, account analytics and opt-in conversation budgets; default budgets disabled.",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Gauge",
+    "shortDescription": "本地用量、账号明细与可选对话预算",
+    "longDescription": "本地读取轮次与账号用量，显示费用来源、项目和日趋势、官方周周期容量估算；每个对话的预算默认关闭，显式开启后提供局部模型上下文。金额为 API 等价费用。",
+    "developerName": "Gauge",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ],
+    "defaultPrompt": [
+      "打开 Gauge 用量面板"
+    ],
+    "brandColor": "#171717",
+    "composerIcon": "./assets/icon.svg",
+    "logo": "./assets/icon.svg"
+  },
+  "hooks": "./hooks/hooks.json"
+}

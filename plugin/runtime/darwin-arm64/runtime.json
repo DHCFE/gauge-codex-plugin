@@ -1,0 +1,19 @@
+{
+  "platform": "darwin-arm64",
+  "node": {
+    "version": "22.23.3",
+    "archive": "node-v22.23.3-darwin-arm64.tar.gz",
+    "sha256": "23b25245dcfb9af7262f8ff142e9e2e0af025368117329e7a7458a51e5922f53"
+  },
+  "python": "3.11.15",
+  "pyinstaller": "6.22.3",
+  "builtOnMacOS": "15.6.1",
+  "signing": "ad-hoc; not notarized",
+  "sources": {
+    "plugin/scripts/account_usage.py": "8c6a02f6d5bf719a1839a7609e2b836686ace4fdfe65c6cce5696feb9784eec5",
+    "plugin/scripts/agent_usage.py": "f3bd45c89691ca106e0ee2201ca9568d8f0663baa69374dedb0bc3640ed3bd35",
+    "plugin/scripts/cost_meter.py": "c8a723e558493c19bf6e46a795425931f994f06c9eec1a35f8ffbbd0e3fded45",
+    "plugin/scripts/live_usage.py": "3794bb659f1cfd5024476ae3a54ee607a090358b536ba722f0d83385ffd7bffb",
+    "plugin/scripts/usage_dispatch.py": "2f6292e0dde33628437007cacddef895612f094d51f9534509e55582462d8271"
+  }
+}
