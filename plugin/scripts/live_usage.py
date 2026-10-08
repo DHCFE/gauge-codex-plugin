@@ -61,38 +61,37 @@ def snapshot(sid=None,home=None,data_dir=None):
     except FileNotFoundError:return waiting(sid,title)
     data_dir.mkdir(parents=True,exist_ok=True,mode=0o700)
     prices=meter.Prices(ROOT/'data/prices.json')
-    with closing(sqlite3.connect(data_dir/'panel.sqlite3',timeout=2)) as db,db:
-        db.execute('CREATE TABLE IF NOT EXISTS states (id TEXT PRIMARY KEY,state TEXT NOT NULL)')
-        row=db.execute('SELECT state FROM states WHERE id=?',(sid,)).fetchone()
-        state=json.loads(row[0]) if row else meter.fresh()
-        if state.get('panel_revision') != 3:state=meter.fresh()
-        state=meter.scan(path,state,sid,budget_seconds=1.5)
-        state['panel_revision']=3
-        db.execute('INSERT OR REPLACE INTO states VALUES (?,?)',(sid,json.dumps(state,separators=(',',':'))))
-    tid=state['current_turn'] or next(reversed(state['turns']),None)
-    if not tid:
-        return waiting(sid,title)
-    report=meter.build_report(state,sid,tid,prices)
-    try:
-        report=agents.aggregate(report,{'transcript_path':str(path)},data_dir,prices,home)
-    except (OSError,ValueError,sqlite3.Error) as exc:
-        report['warnings'].append('子代理统计暂不可用：'+type(exc).__name__)
-        report['subagents']={'discovery_complete':False,'thread_count':0}
+    observed=agents.collect(sid,path,home,data_dir)
+    order=observed['turns']
+    if not order:return waiting(sid,title)
+    tid=observed['current'] or order[-1]
+    records=[r for r in observed['records'] if r['ownership']=='owned']
+    child=[r for r in records if r['threadId']!=sid]
+    unattributed=[r for r in child if r['rootTurnId'] not in order]
+    def summarize(rows,complete=True):
+        item=agents.summarize([agents.request_entry(r) for r in rows],prices)
+        if not complete:agents.invalidate(item)
+        return item
     turns=[]
-    for index,(key,t) in enumerate(state['turns'].items(),1):
-        item=meter.summarize_turn(t,prices)
-        child=report.get('per_turn_children',{}).get(key)
-        if child and child.get('usage'):item=agents.merge([item,child])
-        if key==tid and report.get('turn'):item=report['turn']
-        turns.append(view(item,key,'第 '+str(index)+' 轮',t['status']))
-    total=view(report['thread'],'total','对话累计')
-    total['model']=' / '.join(sorted({model for t in state['turns'].values() for model in t['models']}))
-    sub=report.get('subagents',{})
+    for index,key in enumerate(order,1):
+        rows=[r for r in records if (r['threadId']==sid and r['turnId']==key)
+              or (r['threadId']!=sid and r['rootTurnId']==key)]
+        item=summarize(rows,observed['complete'] and not unattributed)
+        turns.append(view(item,key,'第 '+str(index)+' 轮',observed['statuses'].get(key,'observed')))
+    total=view(summarize(records,observed['complete']),'total','对话累计')
+    warnings=list(observed['issues'])
+    if unattributed:warnings.append('部分子代理用量缺少有效轮次归属，已计入对话累计，未分摊到具体轮次。')
     return {'live':True,'threadId':sid,'title':title,'turns':turns,'total':total,'currentTurnId':tid,
-            'observedAt':int(time.time()*1000),'pricing':report['pricing'],
-            'subagents':{k:sub.get(k,0) for k in ('thread_count','current_thread_count','active_thread_count','unattributed_tokens')},
-            'scanPending':bool(state.get('pending_tail') or state.get('scan_limited')),
-            'warnings':report['warnings'],'source':'Codex local token_usage_record; cumulative delta fallback'}
+            'observedAt':int(time.time()*1000),'pricing':{'kind':'API equivalent','currency':'USD','tier':prices.tier,'verified_at':prices.data['verified_at']},
+            'subagents':{'thread_count':len(observed['descendants']),
+                        'current_thread_count':len({r['threadId'] for r in child if r['rootTurnId']==tid}),
+                        'active_thread_count':len(observed['active']),
+                        'pending_thread_count':len(observed['pending_children']),
+                        'unattributed_tokens':sum(r['usage']['total_tokens'] for r in unattributed),
+                        'discovery_complete':'discovery-incomplete' not in observed['issues'],
+                        'usage_complete':observed['complete']},
+            'scanPending':observed['scan_pending'],
+            'warnings':warnings,'source':'Codex local request ledger; shared ownership and deduplication with budgets'}
 
 if __name__=='__main__':
     os.umask(0o077)

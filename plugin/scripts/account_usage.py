@@ -27,7 +27,7 @@ from zoneinfo import ZoneInfo
 import cost_meter as m
 from agent_usage import lineage
 
-REVISION = 3
+REVISION = 4
 ENVELOPE_TYPE = re.compile(rb'^\s*\{\s*(?:"(?:timestamp|ordinal)"\s*:\s*(?:"[^"]*"|\d+)\s*,\s*)*"type"\s*:\s*"([^"]+)"')
 NON_TELEMETRY = {b'response_item', b'compacted', b'world_state'}
 MAX_FILES = 20000
@@ -68,6 +68,15 @@ def note(state, code):
         state['issues'].append(code)
 
 
+def legacy_note(state, code):
+    # Legacy mirrors cannot make a turn incomplete after its native requests
+    # have established ownership. Keep their diagnostics scoped until merge.
+    key = state['turn'] or ''
+    codes = state['legacyIssues'].setdefault(key, [])
+    if code not in codes:
+        codes.append(code)
+
+
 def identity(p):
     # These fields are telemetry claims, not evidence inferred from auth.json.
     account = p.get('account') if isinstance(p.get('account'), dict) else {}
@@ -81,15 +90,17 @@ def fresh():
             'accountId': None, 'billingPoolId': None, 'billingMode': None,
             'ownedStarted': False, 'marker': False, 'embedded': False,
             'seenTotals': [], 'watermark': None, 'interleaved': False,
-            'turnModels': {}, 'nativeTotals': {}, 'latestTotal': None, 'issues': [], 'line': 0,
+            'turnModels': {}, 'turnRoots': {}, 'turnStatuses': {}, 'turnOrder': [],
+            'nativeTotals': {}, 'latestTotal': None, 'issues': [], 'legacyIssues': {}, 'line': 0,
             'cursor': None, 'pending': False, 'limited': False, 'oversize': None}
 
 
 def record(state, row, raw, key, source, known=True, ownership='owned', **extra):
     p, meta = row['payload'], state['meta']
     values = m.usage(raw)
-    rec = {'id': key, 'threadId': meta['id'], 'turnId': m.label(p.get('turn_id')) or state['turn'],
-           'responseId': m.label(p.get('response_id')), 'rootTurnId': m.label(p.get('root_turn_id')) or state['rootTurn'],
+    tid = m.label(p.get('turn_id')) or state['turn']
+    rec = {'id': key, 'threadId': meta['id'], 'turnId': tid,
+           'responseId': m.label(p.get('response_id')), 'rootTurnId': m.label(p.get('root_turn_id')) or state['turnRoots'].get(tid),
            'timestamp': safe_stamp(row.get('timestamp') or p.get('timestamp')),
            'source': source, 'ownership': ownership, 'usage': values,
            'model': m.label(p.get('model')) or state.get('turnModels', {}).get(m.label(p.get('turn_id')) or state['turn']) or state['model'], 'provider': m.label(p.get('model_provider')) or state['provider'],
@@ -119,6 +130,7 @@ def ingest(state, row):
                 boundary = None
             base = p.get('history_base') or {}
             state['meta'] = {'id': sid, 'parentThreadId': lineage(p) or lineage(dict(p, source=p.get('thread_source'))), 'forkedFromId': m.label(p.get('forked_from_id')),
+                             'requestSessionId': m.label(p.get('session_id')),
                              'historyBaseId': m.label(base.get('thread_id')) if isinstance(base, dict) else None,
                              'boundary': boundary, 'accountId': identity(p), 'accountEvidence': 'creator-account-telemetry' if p.get('creator_account_id') else 'account-telemetry' if identity(p) else 'not-recorded',
                              'billingPoolId': m.label(p.get('billing_pool_id')) or m.label(p.get('rate_limit_id')),
@@ -152,6 +164,10 @@ def ingest(state, row):
             state.setdefault('turnModels', {})[state['turn']] = state['model']
         state['provider'] = m.label(p.get('model_provider')) or state['provider']
         state['rootTurn'] = m.label(p.get('root_turn_id'))
+        if state['turn']:
+            if state['turn'] not in state['turnOrder']:
+                state['turnOrder'].append(state['turn'])
+            state['turnRoots'][state['turn']] = state['rootTurn']
         state['accountId'] = identity(p) or meta['accountId']
         state['accountEvidence'] = 'context-telemetry' if identity(p) else meta.get('accountEvidence', 'account-telemetry' if meta['accountId'] else 'not-recorded')
         state['billingPoolId'] = m.label(p.get('billing_pool_id')) or m.label(p.get('rate_limit_id')) or meta['billingPoolId']
@@ -159,9 +175,21 @@ def ingest(state, row):
     elif kind == 'inter_agent_communication_metadata':
         state['marker'] = p.get('trigger_turn') is True
         state['rootTurn'] = m.label(p.get('root_turn_id')) or state['rootTurn']
+        if state['turn']:
+            state['turnRoots'][state['turn']] = state['rootTurn']
     elif kind == 'event_msg' and p.get('type') == 'task_started':
         state['turn'], state['model'] = m.label(p.get('turn_id')), None
         state['rootTurn'] = m.label(p.get('root_turn_id'))
+        state['marker'] = False
+        if state['turn']:
+            if state['turn'] not in state['turnOrder']:
+                state['turnOrder'].append(state['turn'])
+            state['turnRoots'][state['turn']] = state['rootTurn']
+            state['turnStatuses'][state['turn']] = 'running'
+    elif kind == 'event_msg' and p.get('type') in ('task_complete', 'turn_aborted'):
+        tid = m.label(p.get('turn_id')) or state['turn']
+        if tid:
+            state['turnStatuses'][tid] = 'completed' if p['type'] == 'task_complete' else 'interrupted'
     elif kind == 'event_msg' and p.get('type') == 'model_rerouted':
         state['model'] = m.label(p.get('to_model'))
         if state['turn'] and state['model']:
@@ -182,6 +210,13 @@ def ingest(state, row):
         if not rid or not tid:
             note(state, 'native-request-identity-missing')
             return []
+        if p.get('session_id') is not None:
+            execution = m.label(p.get('session_id'))
+            if not execution or (meta.get('requestSessionId') and execution != meta['requestSessionId']):
+                note(state, 'native-session-identity-mismatch')
+                return []
+        if tid not in state['turnOrder']:
+            state['turnOrder'].append(tid)
         if p.get('turn_token_usage'):
             state['nativeTotals'][tid] = m.usage(p['turn_token_usage'])
         if p.get('thread_token_usage'):
@@ -190,6 +225,8 @@ def ingest(state, row):
             state['latestTotal'] = state['prev']
         return [record(state, row, p.get('usage'), 'native:' + digest([meta['id'], rid]), 'native-request')]
     elif kind == 'event_msg' and p.get('type') == 'token_count':
+        if state['turn'] in state['nativeTotals']:
+            return []  # Native-owned requests supersede stale legacy mirrors.
         info = p.get('info') or {}
         if not isinstance(info, dict) or not info.get('total_token_usage'):
             return []
@@ -213,7 +250,7 @@ def ingest(state, row):
                 state['embedded'] = False
             else:
                 ownership = 'unresolved'
-                note(state, 'legacy-lineage-unresolved')
+                legacy_note(state, 'legacy-lineage-unresolved')
         state['prev'] = total
         if prev == total or digest(total) in state['seenTotals']:
             return []
@@ -222,13 +259,13 @@ def ingest(state, row):
         state['watermark'] = {k: max(watermark[k], total[k]) for k in m.FIELDS}
         if any(total[k] < watermark[k] for k in m.FIELDS):
             state['interleaved'] = True
-            note(state, 'cumulative-counter-reset')
+            legacy_note(state, 'cumulative-counter-reset')
         try:
             # After a regression, lower lineages cannot consume the same high
             # watermark gap again. Exact re-emissions are suppressed above.
             delta = m.subtract(total, watermark if state['interleaved'] else prev or m.zero())
         except m.MeterError:
-            note(state, 'cumulative-counter-reset')
+            legacy_note(state, 'cumulative-counter-reset')
             # Do not charge last_token_usage alone below the watermark. There
             # is no request identity to prove that it is a new expense.
             if last is not None:
@@ -239,7 +276,7 @@ def ingest(state, row):
             return []
         known = delta == last and ownership == 'owned'
         if not known and ownership == 'owned':
-            note(state, 'request-boundaries-missing')
+            legacy_note(state, 'request-boundaries-missing')
         raw = dict(delta)
         if not isinstance(last_raw, dict) or 'cache_write_input_tokens' not in last_raw:
             raw.pop('cache_write_input_tokens', None)
@@ -301,10 +338,11 @@ def scan_file(path, db, allowance, deadline, force=False):
                     f.seek(line_start)
                     state['limited'] = True
                     break
-                allowed = any(('"type": "' + x + '"').encode() in line[:512] or ('"type":"' + x + '"').encode() in line[:512]
-                              for x in ('response_item', 'compacted', 'world_state'))
+                envelope = ENVELOPE_TYPE.match(line[:512])
+                allowed = envelope is not None and envelope.group(1) in NON_TELEMETRY
                 state['oversize'] = not allowed
                 continue
+            decoded = None
             try:
                 # Message/image/tool bodies cannot contribute usage. Skip them
                 # before decoding to avoid parsing GBs of unrelated chat text.
@@ -312,19 +350,30 @@ def scan_file(path, db, allowance, deadline, force=False):
                 if match and match.group(1) in NON_TELEMETRY:
                     state['line'] += 1
                     continue
-                rows = ingest(state, json.loads(line))
+                decoded = json.loads(line)
+                rows = ingest(state, decoded)
                 for rec in rows:
                     old = db.execute('SELECT record FROM account_records WHERE path=? AND id=?', (str(path), rec['id'])).fetchone()
                     if old:
                         if json.loads(old[0]) != rec:
                             # Late duplicates sometimes acquire a new timestamp.
                             prior = json.loads(old[0])
-                            if any(prior.get(k) != rec.get(k) for k in ('usage', 'model', 'accountId', 'billingPoolId')):
+                            if any(prior.get(k) != rec.get(k) for k in ('usage', 'model', 'provider', 'accountId', 'billingPoolId', 'turnId', 'rootTurnId')):
                                 note(state, 'conflicting-request-record')
+                                # A conflicted request is quarantined in every
+                                # consumer, including the live sidebar.
+                                prior['ownership'] = 'unresolved'
+                                prior['conflict'] = True
+                                db.execute('UPDATE account_records SET record=? WHERE path=? AND id=?',
+                                           (json.dumps(prior), str(path), rec['id']))
                         continue
                     db.execute('INSERT INTO account_records VALUES (?,?,?)', (str(path), rec['id'], json.dumps(rec)))
             except (ValueError, TypeError, AttributeError):
-                note(state, 'invalid-telemetry-record')
+                if (isinstance(decoded, dict) and decoded.get('type') == 'event_msg'
+                        and isinstance(decoded.get('payload'), dict) and decoded['payload'].get('type') == 'token_count'):
+                    legacy_note(state, 'invalid-telemetry-record')
+                else:
+                    note(state, 'invalid-telemetry-record')
             state['line'] += 1
         if state['oversize'] is not None:
             state['pending'] = True
@@ -431,8 +480,11 @@ def refresh(home, db, request):
             'filesUnchanged': unchanged, 'filesDeferred': deferred, 'bytesRead': used, 'issues': sorted(set(issues))}
 
 
-def canonical(db):
-    states = [(p, json.loads(s)) for p, s in db.execute('SELECT path,state FROM account_files ORDER BY path')]
+def canonical(db, paths=None, include_inherited=True):
+    # The sidebar scans only the explicitly selected conversation. Sharing this
+    # merger with account/budget queries keeps request ownership identical.
+    where, params = ('', ()) if paths is None else (' WHERE path IN (SELECT value FROM json_each(?))', (json.dumps(list(paths)),))
+    states = [(p, json.loads(s)) for p, s in db.execute('SELECT path,state FROM account_files' + where + ' ORDER BY path', params)]
     threads, issues, candidates = {}, [], {}
     for path, state in states:
         meta = state.get('meta')
@@ -441,7 +493,7 @@ def canonical(db):
             continue
         sid = meta['id']
         if sid in threads:
-            for field in ('parentThreadId', 'forkedFromId', 'accountId', 'billingPoolId', 'project'):
+            for field in ('parentThreadId', 'forkedFromId', 'accountId', 'billingPoolId', 'project', 'boundary', 'historyBaseId', 'requestSessionId'):
                 if threads[sid][field] != meta[field]:
                     issues.append('conflicting-session-metadata')
                     threads[sid][field] = None
@@ -457,15 +509,24 @@ def canonical(db):
             issues.append('records-pending')
         if state['limited']:
             issues.append('scan-incomplete')
-    for path, raw in db.execute('SELECT path,record FROM account_records ORDER BY path,id'):
+    state_by_path = dict(states)
+    for path, raw in db.execute('SELECT path,record FROM account_records' + where + ' ORDER BY path,id', params):
         rec = json.loads(raw)
+        if not include_inherited and rec['source'] == 'native-inherited':
+            continue
+        state = state_by_path[path]
+        if rec['source'] == 'native-request':
+            # A context can arrive after its request. Resolve against that
+            # request's own turn, never the most recently active child turn.
+            rec['model'] = rec['model'] or state['turnModels'].get(rec['turnId'])
+            rec['rootTurnId'] = rec['rootTurnId'] or state['turnRoots'].get(rec['turnId'])
         candidates.setdefault(rec['id'], []).append(rec)
     records = []
     conflicts = 0
     for copies in candidates.values():
         rec = copies[0]
         rec['sourceCopies'] = len(copies)
-        if any(any(c.get(k) != rec.get(k) for k in ('usage', 'model', 'provider', 'accountId', 'billingPoolId', 'ownership', 'timeRangeKnown')) for c in copies[1:]):
+        if rec.get('conflict') or any(any(c.get(k) != rec.get(k) for k in ('usage', 'model', 'provider', 'accountId', 'billingPoolId', 'ownership', 'timeRangeKnown', 'turnId', 'rootTurnId')) for c in copies[1:]):
             rec['conflict'] = True
             rec['accountId'] = None
             rec['billingPoolId'] = None
@@ -483,6 +544,13 @@ def canonical(db):
             rec['accountId'], rec['billingPoolId'] = None, None
         records.append(rec)
     native_turns = {(r['threadId'], r['turnId']) for r in records if r['source'] == 'native-request'}
+    for _, state in states:
+        sid = (state.get('meta') or {}).get('id')
+        for tid, codes in state.get('legacyIssues', {}).items():
+            if (sid, tid or None) not in native_turns:
+                issues.extend(codes)
+                if sid in threads:
+                    threads[sid]['issues'] = sorted(set(threads[sid]['issues'] + codes))
     native_ids = {(r['threadId'], r['responseId']) for r in records if r['source'] == 'native-request'}
     records = [r for r in records if r['source'] != 'native-inherited' or (r['threadId'], r['responseId']) not in native_ids]
     records = [r for r in records if r['source'] == 'native-request' or r['source'] == 'native-inherited' or (r['threadId'], r['turnId']) not in native_turns]
@@ -561,9 +629,33 @@ def indexed_threads(home):
     return result, issues
 
 
-def merge_index(home, threads):
+def merge_index(home, threads, conversation_id=None):
     indexed, issues = indexed_threads(home)
     missing, nonlocal_count = 0, 0
+    parents = {sid: t['parentThreadId'] for sid, t in threads.items()}
+    for sid, item in indexed.items():
+        source = item.get('source')
+        if isinstance(source, str):
+            try:source = json.loads(source)
+            except ValueError:source = None
+        parents.setdefault(sid, lineage({'source': source}))
+    def root_of(sid):
+        seen = {sid}
+        while parents.get(sid):
+            sid = parents[sid]
+            if sid in seen:return None
+            seen.add(sid)
+        return sid
+    def belongs_to(sid, ancestor):
+        seen = set()
+        while sid not in seen:
+            if sid == ancestor:return True
+            seen.add(sid)
+            sid = parents.get(sid)
+            if sid is None:break
+        return False
+    if conversation_id is not None:
+        indexed = {sid: item for sid, item in indexed.items() if belongs_to(sid, conversation_id)}
     for sid, row in indexed.items():
         name = row.get('name')
         name = name[:100] if isinstance(name, str) and name else sid
@@ -576,7 +668,7 @@ def merge_index(home, threads):
         status = 'missing-local' if local_path else 'non-local-or-missing'
         missing += bool(local_path)
         nonlocal_count += not local_path
-        threads[sid] = {'id': sid, 'title': name, 'conversationId': sid, 'parentThreadId': None, 'forkedFromId': None,
+        threads[sid] = {'id': sid, 'title': name, 'conversationId': root_of(sid), 'parentThreadId': parents.get(sid), 'forkedFromId': None,
                         'historyBaseId': None, 'boundary': None, 'accountId': None, 'billingPoolId': None, 'billingMode': None,
                         'project': row.get('cwd'), 'createdAt': None, 'archived': bool(row.get('archived')),
                         'sourceFiles': 0, 'metadataConflict': False, 'issues': [status], 'usageStatus': status}
@@ -680,13 +772,21 @@ def snapshot(request=None, home=None, data_dir=None):
     data_dir = Path(data_dir or os.environ.get('TOKENLENS_DATA', home / 'plugins/data/tokenlens-local/tokenlens-prototype')).expanduser().resolve()
     data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     prices = m.Prices(request.get('pricesFile'), tier=request.get('tier', 'standard'))
-    with closing(sqlite3.connect(data_dir / 'account-ledger.sqlite3', timeout=2)) as db, db:
-        schema(db)
-        db.execute('BEGIN IMMEDIATE')
-        scan = refresh(home, db, request)
-        records, threads, issues = canonical(db)
-    index_stats, index_issues = merge_index(home, threads)
-    issues.extend(index_issues)
+    if request.get('conversationId'):
+        from agent_usage import collect
+        scoped = collect(request['conversationId'], None, home, data_dir, force_rescan=request.get('forceRescan', False))
+        records, threads, issues, scan = scoped['records'], scoped['threads'], scoped['issues'], scoped['scan']
+    else:
+        with closing(sqlite3.connect(data_dir / 'account-ledger.sqlite3', timeout=2)) as db, db:
+            schema(db)
+            db.execute('BEGIN IMMEDIATE')
+            scan = refresh(home, db, request)
+            records, threads, issues = canonical(db)
+    if request.get('conversationId'):
+        index_stats = scoped['index_stats']
+    else:
+        index_stats, index_issues = merge_index(home, threads)
+        issues.extend(index_issues)
     records = [price_record(r, prices) for r in records]
     bounded = start is not None or end is not None
     uncertain_time = [r for r in records if r['ownership'] == 'owned' and (r['timestamp'] is None or not r['timeRangeKnown'])]
@@ -772,7 +872,7 @@ def snapshot(request=None, home=None, data_dir=None):
     if bounded and uncertain_time:
         issues.append('time-attribution-incomplete')
     scan_complete = scan['discoveryComplete'] and not any(x in issues for x in ('transcript-unreadable', 'scan-deferred', 'records-pending', 'scan-incomplete', 'session-metadata-missing', 'invalid-telemetry-record', 'oversized-telemetry-record', 'index-discovery-incomplete', 'thread-index-unavailable', 'file-replaced-during-scan', 'file-disappeared-during-scan'))
-    usage_complete = scan_complete and not index_stats['missingLocalThreads'] and not any(x in issues for x in ('native-total-gap', 'cumulative-counter-reset', 'legacy-lineage-unresolved', 'conflicting-request-record', 'conflicting-session-metadata', 'request-boundaries-missing', 'history-ordinal-missing', 'invalid-history-boundary', 'native-origin-transcript-missing'))
+    usage_complete = scan_complete and not index_stats['missingLocalThreads'] and not any(x in issues for x in ('native-total-gap', 'cumulative-counter-reset', 'legacy-lineage-unresolved', 'conflicting-request-record', 'conflicting-session-metadata', 'request-boundaries-missing', 'history-ordinal-missing', 'invalid-history-boundary', 'native-origin-transcript-missing', 'lineage-cycle', 'descendant-limit', 'descendant-depth-limit', 'descendant-usage-pending', 'native-request-identity-missing', 'native-session-identity-mismatch'))
     coverage = {**scan, **index_stats, 'scope': 'discoverable-local-telemetry', 'accountLedgerComplete': False,
                 'localScanComplete': scan_complete, 'usageComplete': usage_complete,
                 'timeFilterExact': not bounded or not uncertain_time, 'accountAttributionComplete': not unknown_accounts,

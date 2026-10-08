@@ -38727,7 +38727,7 @@ import { fileURLToPath } from "node:url";
 var script = new URL("./scripts/usage_dispatch.py", import.meta.url);
 var engine = new URL(`./runtime/${process.platform}-${process.arch}/usage-engine/tokenlens-usage`, import.meta.url);
 var pending = /* @__PURE__ */ new Map();
-var accountQueue = Promise.resolve();
+var telemetryQueue = Promise.resolve();
 async function readTelemetry(operation, request = {}) {
   const body = operation === "thread" ? { operation, thread_id: request.thread_id } : { operation, request };
   const key = JSON.stringify(body);
@@ -38771,8 +38771,8 @@ async function readTelemetry(operation, request = {}) {
     });
     child.stdin.end(JSON.stringify(body));
   });
-  const running = (operation === "account" ? accountQueue.then(execute, execute) : execute()).finally(() => pending.delete(key));
-  if (operation === "account") accountQueue = running.catch(() => {
+  const running = telemetryQueue.then(execute, execute).finally(() => pending.delete(key));
+  telemetryQueue = running.catch(() => {
   });
   pending.set(key, running);
   return running;
@@ -38885,7 +38885,7 @@ async function readCodexAppServer({
     });
   }
   try {
-    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.6" }, capabilities: { experimentalApi: true } });
+    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.7" }, capabilities: { experimentalApi: true } });
     child.stdin.write(JSON.stringify({ method: "initialized" }) + "\n");
     const auth = await call("account/read", { refreshToken: false });
     if (!auth?.account || auth.account.type !== "chatgpt") return {
@@ -40195,11 +40195,11 @@ function createUpdateService({ repository, currentVersion, dataDir, fetchImpl = 
 }
 
 // src/server.mjs
-var APP_URI = "ui://tokenlens/live-v3-0.5.6.html";
+var APP_URI = "ui://tokenlens/live-v3-0.5.7.html";
 var icon = readFileSync3(new URL("./assets/icon.svg", import.meta.url), "utf8");
 var panelSnapshot = createPanelSnapshot({ dataDir: pluginDataDir() });
 var updateConfig = JSON.parse(readFileSync3(new URL("./data/release.json", import.meta.url), "utf8"));
-var updates = createUpdateService({ ...updateConfig, currentVersion: "0.5.6", dataDir: pluginDataDir() });
+var updates = createUpdateService({ ...updateConfig, currentVersion: "0.5.7", dataDir: pluginDataDir() });
 var integration = createIntegration({
   readAccount: (request) => readTelemetry("account", request),
   readThread: (thread_id) => readTelemetry("thread", { thread_id }),
@@ -40245,7 +40245,7 @@ function openPanel(args, extra) {
   };
 }
 function createMcpServer() {
-  const server = new McpServer({ name: "tokenlens", title: "Gauge", version: "0.5.6", icons: [{ src: `data:image/svg+xml,${encodeURIComponent(icon)}`, mimeType: "image/svg+xml", sizes: ["any"] }] });
+  const server = new McpServer({ name: "tokenlens", title: "Gauge", version: "0.5.7", icons: [{ src: `data:image/svg+xml,${encodeURIComponent(icon)}`, mimeType: "image/svg+xml", sizes: ["any"] }] });
   G(server, "tokenlens-ui", APP_URI, {}, async () => ({ contents: [{
     uri: APP_URI,
     mimeType: L,

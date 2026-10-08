@@ -10,10 +10,10 @@
   "builtOnMacOS": "15.6.1",
   "signing": "ad-hoc; not notarized",
   "sources": {
-    "plugin/scripts/account_usage.py": "8c6a02f6d5bf719a1839a7609e2b836686ace4fdfe65c6cce5696feb9784eec5",
-    "plugin/scripts/agent_usage.py": "f3bd45c89691ca106e0ee2201ca9568d8f0663baa69374dedb0bc3640ed3bd35",
+    "plugin/scripts/account_usage.py": "ab01277ef9e15b9432368178709ba663791631d2a20e3b3f8cc79828a3f8e79a",
+    "plugin/scripts/agent_usage.py": "3a898adfce29af3879485fff6af6edf27b53df0fa1bffea03a6ae08c8f86feef",
     "plugin/scripts/cost_meter.py": "c8a723e558493c19bf6e46a795425931f994f06c9eec1a35f8ffbbd0e3fded45",
-    "plugin/scripts/live_usage.py": "3794bb659f1cfd5024476ae3a54ee607a090358b536ba722f0d83385ffd7bffb",
+    "plugin/scripts/live_usage.py": "1139afc3bb3febe0db5e442ecc2fd2d1576f16f69d52ec8698c4f85e4b400f7b",
     "plugin/scripts/usage_dispatch.py": "2f6292e0dde33628437007cacddef895612f094d51f9534509e55582462d8271"
   }
 }

@@ -158,7 +158,7 @@ async function readCodexAppServer({
     });
   }
   try {
-    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.6" }, capabilities: { experimentalApi: true } });
+    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.7" }, capabilities: { experimentalApi: true } });
     child.stdin.write(JSON.stringify({ method: "initialized" }) + "\n");
     const auth = await call("account/read", { refreshToken: false });
     if (!auth?.account || auth.account.type !== "chatgpt") return {
@@ -1036,7 +1036,7 @@ import { fileURLToPath } from "node:url";
 var script = new URL("./scripts/usage_dispatch.py", import.meta.url);
 var engine = new URL(`./runtime/${process.platform}-${process.arch}/usage-engine/tokenlens-usage`, import.meta.url);
 var pending = /* @__PURE__ */ new Map();
-var accountQueue = Promise.resolve();
+var telemetryQueue = Promise.resolve();
 async function readTelemetry(operation, request = {}) {
   const body = operation === "thread" ? { operation, thread_id: request.thread_id } : { operation, request };
   const key = JSON.stringify(body);
@@ -1080,8 +1080,8 @@ async function readTelemetry(operation, request = {}) {
     });
     child.stdin.end(JSON.stringify(body));
   });
-  const running = (operation === "account" ? accountQueue.then(execute, execute) : execute()).finally(() => pending.delete(key));
-  if (operation === "account") accountQueue = running.catch(() => {
+  const running = telemetryQueue.then(execute, execute).finally(() => pending.delete(key));
+  telemetryQueue = running.catch(() => {
   });
   pending.set(key, running);
   return running;

@@ -29,3 +29,11 @@ Budget persistence and UI reuse these interfaces without importing Swift UI.
 Module-specific review evidence and limitations are in
 `development-status/ledger.json`, `quota.json`, `budget.json` and `ui.json`.
 
+
+
+Additional development reference reviewed for Gauge 0.5.7 (2026-10-08):
+[CodexBar fba66c0b5115294d93a4c614ac606c9c46c8ed45](https://github.com/steipete/CodexBar/tree/fba66c0b5115294d93a4c614ac606c9c46c8ed45), including
+`CostUsageJsonl.swift`, `CostUsageScanner+RequestIdentity.swift`, and
+`CodexSubagentRolloutShape.swift`. Gauge independently implements its Python
+ledger; no upstream Swift source or binary is bundled. Architecture and audit
+scope are documented in `docs/subagent-accounting.md` in the development tree.
