@@ -1,0 +1,33 @@
+export default async function check(page,{outputDir='output/playwright/ui-d-rework'}={}){
+  const assert=(value,message)=>{if(!value)throw new Error(message);};
+  await page.setViewportSize({width:1000,height:900});await page.emulateMedia({colorScheme:'light',reducedMotion:'reduce'});
+  await page.locator('#accountTab').click();await page.locator('#accountRows tr').first().waitFor();
+  assert(await page.locator('#todayCost').textContent()==='$17.25','Today local cost');
+  assert((await page.locator('#todayTokens').textContent()).includes('54,000'),'Today tokens');
+  assert((await page.locator('#windowCost').textContent()).includes('$112.35'),'Official cycle local cost');
+  assert((await page.locator('#windowTokens').textContent()).includes('320,000'),'Cycle tokens');
+  assert(await page.locator('#monthCost').textContent()==='$180.75','Thirty-day cost');
+  assert(await page.locator('#weeklyUsed').textContent()==='35.0%','Official used');
+  assert((await page.locator('#weeklyRemaining').textContent()).includes('65.0%'),'Official remaining');
+  assert(await page.locator('#weeklyCapacity').textContent()==='$321.00','Backend assumption-based estimate');
+  assert((await page.locator('#quotaWarnings').textContent()).split('\n').length<=2,'Main explanation concise');
+  assert((await page.locator('#accountCost').textContent()).includes('$12.35'),'Known subtotal not hidden');
+  assert((await page.locator('#accountTokens').textContent()).includes('1,800'),'Known token subtotal not hidden');
+  const rowText=await page.locator('#accountRows').textContent();assert(rowText.includes('1,800')&&rowText.includes('$12.3456')&&rowText.includes('gpt-6.1-sol'),'Actual ledger/adapter fields remain populated');
+  await page.locator('#accountRows tr').click();const tokenDetails=await page.locator('#inspectorTokens').textContent();assert(tokenDetails.includes('600')&&tokenDetails.includes('900')&&tokenDetails.includes('300'),'Token categories available in drilldown');assert((await page.locator('#inspectorStatus').textContent()).includes('≥'),'Drilldown explains subtotal');
+  await page.screenshot({path:outputDir+'/observed-cost-light.png',fullPage:true});
+  await page.evaluate(()=>window.testReceive({_meta:{quota:{...window.fixture.quota,estimate:{...window.fixture.quota.estimate,status:'unavailable',capacityUsd:null,estimatedCapacityUsd:null,qualityReasons:[{code:'ledger_period_mismatch',severity:'blocker'}]}}}}));
+  assert(await page.locator('#weeklyCapacity').textContent()==='—','Cannot manufacture capacity after period conflict');
+  assert((await page.locator('#quotaWarnings').textContent()).includes('周期不一致'),'Actionable conflict visible');
+  await page.evaluate(()=>window.testReceive({_meta:{quota:{...window.fixture.quota,status:'unavailable',weekly:null,estimate:{status:'unavailable',observedCycleUsd:null,capacityUsd:null,estimatedCapacityUsd:null},costs:{...window.fixture.quota.costs,today:{apiEquivalentUsd:null,tokens:null,totalTokens:null},currentWindow:{apiEquivalentUsd:112.35,tokens:320000,totalTokens:320000}}}}}));
+  assert(await page.locator('#todayCost').textContent()==='—','Unknown amount remains unknown');
+  assert((await page.locator('#todayTokens').textContent()).trim()==='','Unknown tokens not zero');
+  assert((await page.locator('#windowCost').textContent()).includes('$112.35'),'Official quota failure does not erase local costs');
+  await page.evaluate(()=>window.testReceive({_meta:{quota:window.fixture.quota}}));
+  await page.setViewportSize({width:390,height:844});await page.emulateMedia({colorScheme:'dark',reducedMotion:'reduce'});
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Narrow account layout');const darkPage=await page.context().browser().newPage({viewport:{width:390,height:844},colorScheme:'dark',reducedMotion:'reduce',timezoneId:'Asia/Shanghai'});await darkPage.goto(page.url());await darkPage.locator('#accountTab').click();await darkPage.locator('#accountRows tr').first().waitFor();await darkPage.screenshot({path:outputDir+'/observed-cost-dark.png'});await darkPage.close();
+  await page.locator('#budgetTab').click();await page.waitForFunction(()=>window.calls.some(x=>x.name==='get_conversation_budget'));
+  assert(!await page.locator('#budgetEnabled').isChecked(),'Budget remains disabled');
+  assert(await page.evaluate(()=>!window.calls.some(x=>['get_budget_context','set_conversation_budget'].includes(x.name))&&window.sentMessages.length===0),'No budget mutation, context or model message');
+  return 'PASS: independent local/official shapes; today/cycle/30-day costs+tokens; observed subtotal with missing IDs; official used/remaining/capacity; removed explanation UI; blocked estimate retains local costs; null/failure states; budget remains off.';
+}

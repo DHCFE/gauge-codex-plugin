@@ -23,7 +23,7 @@ def view(item, key, title, status=None):
             'totalTokens': u['total_tokens'] if u else 0, 'pending': u is None,
             'usd': [known('input'), known('cached_input')+known('cache_write'), known('output')],
             'amount': float(item['usd']) if item.get('usd') is not None else None,
-            'costComplete': item.get('cost_complete',False),
+            'costComplete': item.get('cost_complete',False), 'pricedTokens': item.get('priced_tokens',0),
             'model': ' / '.join(item.get('models',[])) or '未记录模型',
             'status': status or item.get('status','observed'), 'source': item.get('source'),
             'warnings': item.get('warnings',[])}

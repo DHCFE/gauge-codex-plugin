@@ -56,8 +56,10 @@ Codex 会下载最新安装包并完成安装。若客户端弹出确认提示�
 
 ## 之后有新版怎么办
 
-打开面板会自动检查新版；出现「更新」按钮时，点击即可请求 agent 升级。[已有用户的更新说明](UPDATE.md) · [发行记录](https://github.com/DHCFE/gauge-codex-plugin/releases)
+打开面板会自动检查新版，也可以随时点「检查更新」。发现新版后，点「一键更新」即可下载、校验并安装，保留本地统计和预算；完成后保存工作并重新打开客户端。0.5.7 及更旧版本需要先由 Codex 帮忙升级一次，之后即可使用新入口。[已有用户的更新说明](UPDATE.md) · [发行记录](https://github.com/DHCFE/gauge-codex-plugin/releases)
 
 用量从本机 Codex 记录读取，统计缓存不保存聊天正文或凭据。新版检查仅读取公开版本信息，不发送账号或对话数据。
 
 第三方依赖和运行时许可见 [第三方声明](THIRD-PARTY-NOTICES.md)。
+
+开发者可查看 [维护与构建说明](packaging/MAINTENANCE.md)、[变更记录](CHANGELOG.md)，以及仓库中的 `src/`、`web/`、`plugin/scripts/` 和测试。

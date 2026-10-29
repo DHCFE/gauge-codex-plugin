@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gauge</title><style>/* TOKENLENS_APP_STYLES */</style></head><body><main class="app">
+<header><div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>Gauge<span class="release-version" id="releaseVersion">0.5.8</span></div><div class="actions"><button class="update-available" id="checkUpdate">检查更新</button><button class="update-available" id="updateAvailable" hidden>一键更新</button><button class="icon" id="refresh" title="刷新" aria-label="刷新用量"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2 5M20 7l-3-3"/></svg></button><button class="icon" id="expand" title="展开" aria-label="展开或收起插件"><svg viewBox="0 0 24 24"><path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/></svg></button></div></header>
+<nav class="tabs" role="tablist" aria-label="Gauge"><button id="conversationTab" aria-controls="conversationNav meterView overviewView" role="tab" aria-selected="true">对话</button><button id="accountTab" aria-controls="accountView" role="tab" aria-selected="false">账号</button><button id="budgetTab" aria-controls="budgetView" role="tab" aria-selected="false">预算</button></nav>
+<div class="thread-heading" id="threadHeading"><span id="title">当前对话</span><div class="status"><i></i><span id="connection">正在连接…</span></div></div>
+<nav class="segments" id="conversationNav" role="tablist" aria-label="对话用量"><button id="turnTab" aria-controls="meterView" role="tab" aria-selected="true">轮次</button><button id="totalTab" aria-controls="meterView" role="tab" aria-selected="false">累计</button><button id="overviewTab" aria-controls="overviewView" role="tab" aria-selected="false">趋势</button></nav>
+<section id="meterView" role="tabpanel" aria-labelledby="turnTab"><div class="panel-grid"><div class="detail-pane"><div class="detail-toolbar"><div class="round-picker"><button type="button" id="roundSelect" class="round-trigger" aria-label="选择轮次" aria-haspopup="listbox" aria-expanded="false" aria-controls="roundOptions" disabled><span class="round-label">选择轮次</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button><div class="round-options" id="roundOptions" role="listbox" aria-label="选择轮次" hidden></div></div><div class="round-nav"><button id="prevTurn" aria-label="上一轮" title="上一轮"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></button><button id="nextTurn" aria-label="下一轮" title="下一轮"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg></button><button id="latestTurn">回到本轮</button></div></div><div class="eyebrow" id="scope">本轮 · API 等价</div><div class="amount" id="amount"><small>$</small>—</div><div class="sub"><span class="mono" id="tokens">等待记录</span><span id="model"></span></div><div class="bar" id="costBar"></div><div class="breakdown" id="breakdown"></div><button class="explain" id="explain"><span>解释用量</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></div><div class="turns"><div class="section"><span>全部轮次</span><span id="count"></span></div><div id="turnList"></div><div class="notice" id="agentStatus"></div><details id="warningDetails" hidden><summary>数据说明</summary><p id="warnings" class="status-copy"></p></details></div></div></section>
+<section id="overviewView" role="tabpanel" aria-labelledby="overviewTab" hidden><div class="overview-head"><h1>对话用量趋势</h1><span class="tag">本地记录</span></div><div class="summary"><div><div class="eyebrow">API 美元等价</div><div class="amount" id="overviewCost">—</div></div><div><div class="eyebrow">累计 Tokens</div><div class="secondary mono" id="overviewTokens">—</div></div><div class="full-only"><div class="eyebrow">对话轮次</div><div class="secondary mono" id="overviewCount">—</div></div></div><div class="chart"><div class="chart-title">最近 12 轮 · Tokens</div><div class="columns" id="chart"></div></div><table class="details"><thead><tr><th>轮次</th><th>Tokens</th><th>API 等价</th></tr></thead><tbody id="historyRows"></tbody></table></section>
+
+<section id="accountView" role="tabpanel" aria-labelledby="accountTab" hidden>
+  <div class="account-meta"><div><div class="status-copy" id="accountStatus" role="status"></div></div><button class="icon" id="accountRefresh" title="刷新账号用量" aria-label="刷新账号用量"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2 5M20 7l-3-3"/></svg></button></div>
+  <section class="workspace-section" aria-labelledby="costOverviewHeading">
+    <div class="section-head"><h1 id="costOverviewHeading">费用（API 等价）</h1></div>
+    <div class="metric-grid cost-overview">
+      <div><div class="eyebrow">今日</div><div class="value mono" id="todayCost">—</div><div class="muted" id="todayTokens"></div></div>
+      <div><div class="eyebrow">周窗口</div><div class="value mono" id="windowCost">—</div><div class="muted" id="windowTokens"></div></div>
+      <div><div class="eyebrow">近 30 天</div><div class="value mono" id="monthCost">—</div><div class="muted" id="monthTokens"></div></div>
+    </div>
+  </section>
+  <section class="workspace-section" aria-labelledby="quotaHeading">
+    <div class="section-head"><h2 id="quotaHeading">周额度</h2></div>
+    <div class="metric-grid quota-metrics">
+      <div><div class="eyebrow">已用比例</div><div class="value mono" id="weeklyUsed">—</div><div class="muted" id="weeklyRemaining"></div></div>
+      <div><div class="eyebrow">容量估算（$）</div><div class="value mono" id="weeklyCapacity">—</div></div>
+    </div>
+    <p class="muted" id="weeklyReset"></p>
+    <div class="quota-meter" role="meter" aria-label="官方周额度已用" id="quotaMeter" hidden><span id="quotaFill"></span></div>
+    <div class="inline-notice" id="quotaWarnings"></div>
+    <details id="quotaPoolDetails" hidden><summary>其他额度窗口</summary><div id="quotaPools" class="detail-content"></div></details>
+  </section>
+  <section class="workspace-section">
+    <div class="section-head"><h2>本地对话</h2><div class="export-actions"><select id="exportFormat" aria-label="导出格式"><option value="csv">CSV</option><option value="json">JSON</option></select><button class="button" id="accountExport">导出</button></div></div>
+    <div class="list-tools">      <div class="field search-field"><label for="accountSearch">搜索</label><input type="search" id="accountSearch" placeholder="搜索对话、项目或模型" autocomplete="off"></div><details id="accountFilters" class="filter-details"><summary>筛选</summary><div class="filter-content">    <div class="filters">
+
+      <div class="field"><label for="accountModel">模型</label><select id="accountModel"><option value="">全部模型</option></select></div>
+      <div class="field"><label for="accountProject">项目</label><select id="accountProject"><option value="">全部项目</option></select></div>
+      <div class="field"><label for="accountFilter">记录范围</label><select id="accountFilter"><option value="">全部发现记录</option><option value="archived">已归档</option><option value="agents">子代理</option><option value="unknown">账号归属未知</option><option value="partial">未完整计价</option></select></div>
+      <div class="field"><label for="accountSort">排序</label><select id="accountSort"><option value="recent">最近更新</option><option value="cost">费用从高到低</option><option value="tokens">Tokens 从高到低</option><option value="title">对话名称</option></select></div>
+    </div>
+    <div class="filters"><div class="field"><label for="accountStart">起始日期 · 含当日</label><input type="date" id="accountStart"></div><div class="field"><label for="accountEnd">结束日期 · 不含当日</label><input type="date" id="accountEnd"></div><button class="button" id="applyAccountRange">应用日期</button><button class="text-button" id="clearAccountRange">全部历史</button></div>
+</div></details></div>
+    <div class="range-summary"><div><div class="eyebrow">范围费用</div><div class="value mono" id="accountCost">—</div></div><div><div class="eyebrow">Tokens</div><div class="value mono" id="accountTokens">—</div></div></div>
+    <div class="range-meta"><p class="muted" id="accountRangeStatus"></p><p class="muted" id="accountRowCount"></p></div>
+    <div class="inline-notice" id="accountNotice" role="status"></div>
+    <div class="table-scroll" id="accountTableScroll"><table class="details account-table"><thead><tr><th>对话</th><th>模型 / 更新</th><th>Tokens</th><th>API 等价</th></tr></thead><tbody id="accountRows"></tbody></table></div>
+    <div class="empty" id="accountEmpty">尚无可读记录</div>
+    <section class="inspector" id="accountInspector" hidden aria-labelledby="inspectorTitle"><div class="section-head"><h2 id="inspectorTitle"></h2><button class="text-button" id="closeInspector">收起明细</button></div><p class="muted" id="inspectorMeta"></p><div class="token-columns" id="inspectorTokens"></div><div class="inline-notice" id="inspectorStatus"></div><button class="text-button" id="openAccountThread">查看该对话轮次 →</button><div id="inspectorModels"></div></section>
+  </section>
+  <details class="analysis-details" id="usageAnalysis"><summary>分析</summary>  <section class="workspace-section"><h2>费用来源</h2><div class="source-grid"><div><h3>模型</h3><div id="modelSources"></div></div><div><h3>输入、缓存与输出</h3><div id="tokenSources"></div></div></div><div class="agent-sources"><h3>主对话与子代理</h3><div id="agentSources"></div></div></section>
+  <section class="workspace-section"><h2>项目汇总与按日趋势</h2><div class="source-grid"><div><h3>项目 · API 等价</h3><div id="projectSummary"></div></div><div><h3>每日 · API 等价</h3><div class="day-chart" id="dayChart"></div><div id="daySummary"></div></div></div></section></details>
+</section>
+<section id="budgetView" role="tabpanel" aria-labelledby="budgetTab" hidden>
+  <section class="workspace-section">
+    <div class="section-head"><div class="budget-title"><h1>对话预算</h1><span class="tag" id="budgetState">默认关闭</span></div></div>
+    <p class="muted" id="budgetThread">等待明确的对话标识</p>
+    <label class="toggle-label"><input type="checkbox" id="budgetEnabled"><span>启用预算</span></label>
+    <form id="budgetForm" hidden>
+      <div class="budget-form"><div class="field"><label for="budgetMode">预算方式</label><select id="budgetMode"><option value="amount">API 等价金额（美元）</option><option value="percentage">估算整周容量的百分比</option></select></div><div class="field"><label for="budgetValue" id="budgetValueLabel">金额（美元）</label><input id="budgetValue" type="number" min="0.0001" step="any" required inputmode="decimal" placeholder="例如 20"></div></div>
+      <p class="muted" id="budgetPreview"></p>
+      <div class="form-actions"><button type="submit" class="button primary" id="budgetSave">保存并启用</button><button type="button" class="button" id="budgetCancel">取消调整</button></div>
+    </form>
+    <div class="inline-notice" id="budgetNotice" role="status"></div>
+    <div id="budgetSummary" hidden><button type="button" class="text-button" id="budgetEdit">调整预算 →</button><div class="metric-grid"><div><div class="eyebrow">固定预算 · API 等价</div><div class="value mono" id="budgetAmount">—</div></div><div><div class="eyebrow">生效后累计已用</div><div class="value mono" id="budgetSpent">—</div></div><div><div class="eyebrow" id="budgetRemainingLabel">剩余预算</div><div class="value mono" id="budgetRemaining">—</div></div></div><div class="budget-info" id="budgetBasis"></div></div>
+    <p class="status-copy" id="budgetDelivery"></p>
+  </section>
+  <section class="workspace-section">
+    <div class="section-head"><h2>已启用的预算</h2><button class="button" id="budgetRefresh">刷新</button></div>
+    <div class="inline-notice" id="budgetOverviewStatus"></div>
+    <div id="budgetOverviewContent" hidden>
+      <div class="metric-grid"><div><div class="eyebrow">已分配计划 · API 等价</div><div class="value mono" id="budgetAllocated">—</div></div><div><div class="eyebrow">已启用对话</div><div class="value mono" id="budgetCount">—</div></div></div>
+      <div class="table-scroll"><table class="details"><thead><tr><th>对话</th><th>预算 / 已用</th><th>剩余 / 超支</th><th>送达状态</th></tr></thead><tbody id="budgetRows"></tbody></table></div>
+    </div>
+    <div class="empty" id="budgetEmpty">尚未启用预算</div>
+  </section>
+</section>
+<div class="inline-notice" id="globalNotice" role="status" aria-live="polite"></div>
+</main><script>/* TOKENLENS_APP_SCRIPT */</script></body></html>

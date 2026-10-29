@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "verified_at": "2026-10-01",
+  "verified_at": "2026-10-29",
   "currency": "USD",
   "unit": "per 1 million tokens",
   "sources": [
@@ -9,7 +9,8 @@
     "https://developers.openai.com/api/docs/models/gpt-6-astra",
     "https://developers.openai.com/api/docs/guides/prompt-caching",
     "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
-    "https://developers.openai.com/api/docs/models/gpt-6.1-sol"
+    "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+    "https://developers.openai.com/api/docs/models/gpt-6.1-terra"
   ],
   "aliases": {
     "gpt-5.6": "gpt-5.6-sol"
@@ -624,6 +625,68 @@
             "cached_input": "0.20",
             "cache_write": "5",
             "output": "15"
+          }
+        }
+      }
+    },
+    "gpt-6.1-terra": {
+      "cache_write": true,
+      "long_context_threshold": 272000,
+      "tiers": {
+        "standard": {
+          "short": {
+            "input": "1.00",
+            "cached_input": "0.05",
+            "cache_write": "1.25",
+            "output": "5.00"
+          },
+          "long": {
+            "input": "2.00",
+            "cached_input": "0.10",
+            "cache_write": "2.50",
+            "output": "7.500"
+          }
+        },
+        "batch": {
+          "short": {
+            "input": "0.500",
+            "cached_input": "0.025",
+            "cache_write": "0.625",
+            "output": "2.500"
+          },
+          "long": {
+            "input": "1.000",
+            "cached_input": "0.050",
+            "cache_write": "1.250",
+            "output": "3.7500"
+          }
+        },
+        "flex": {
+          "short": {
+            "input": "0.500",
+            "cached_input": "0.025",
+            "cache_write": "0.625",
+            "output": "2.500"
+          },
+          "long": {
+            "input": "1.000",
+            "cached_input": "0.050",
+            "cache_write": "1.250",
+            "output": "3.7500"
+          }
+        },
+        "fast": {
+          "short": {
+            "input": "2.00",
+            "cached_input": "0.10",
+            "cache_write": "2.50",
+            "output": "10.00"
+          },
+          "long": {
+            "input": "4.00",
+            "cached_input": "0.20",
+            "cache_write": "5.00",
+            "output": "15.000"
           }
         }
       }

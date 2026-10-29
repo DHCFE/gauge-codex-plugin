@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {uniqueDiagnostics,normalizeTokens,normalizeCost,finite,formatMoney,formatNumber,payload,normalizeConversation,filterConversations,budgetDeliveryLabel} from '../web/account-model.js';
+for(const value of [null,undefined,'',false,NaN,Infinity]) assert.equal(finite(value),null,'Unknown cannot become zero');
+assert.equal(normalizeConversation({threadId:'nested',models:['gpt-6.1-sol'],lastActivity:1234567890000,total:{amount:null,knownUsd:'1.2500',costComplete:false,cacheWrite:null,output:100,reasoning:80}}).amount,1.25,'Ledger known subtotal preserved');
+assert.equal(normalizeConversation({threadId:'nested',total:{amount:null,knownUsd:'1.2500',costComplete:false,cacheWrite:null,output:100,reasoning:80}}).tokens.cacheWrite,null,'Unknown cache writes stay unknown');
+assert.throws(()=>payload({_meta:{needsThread:true}},'budget'),'Missing identity cannot look like saved budget');
+assert.equal(formatMoney(null),'—');assert.equal(formatNumber(null),'—');assert.equal(formatMoney(0),'$0.0000');
+assert.equal(normalizeConversation({threadId:'missing',usageStatus:'unavailable',total:{requestCount:0,amount:null,knownUsd:'0',costComplete:false,output:0}}).amount,null);
+assert.equal(normalizeConversation({threadId:'missing',usageStatus:'unavailable',total:{requestCount:0,amount:null,knownUsd:'0',costComplete:false,output:0}}).tokens.output,null);
+assert.equal(normalizeConversation({threadId:'unpriced',total:{requestCount:3,unpricedRequests:3,amount:null,knownUsd:'0',costComplete:false}}).amount,null);
+assert.equal(normalizeConversation({threadId:'one',tokens:{output:100,reasoning:80}}).tokens.output,100,'Reasoning remains included in output');
+const rows=[normalizeConversation({threadId:'a',title:'项目 A',accountId:'x',amountUsd:0,costComplete:true,archived:true}),normalizeConversation({threadId:'b',title:'子代理',parentThreadId:'a',tokens:{total:10}})];
+assert.equal(filterConversations(rows,{status:'archived'})[0].id,'a');
+assert.equal(filterConversations(rows,{status:'agents'})[0].id,'b');
+assert.equal(filterConversations(rows,{status:'unknown'})[0].id,'b');
+assert.equal(filterConversations(rows,{search:'项目'})[0].id,'a');
+assert.equal(filterConversations([normalizeConversation({threadId:'multi',models:['first','second']})],{model:'second'}).length,1,'Model filter supports conversations with multiple models');
+assert.equal(filterConversations(rows,{sort:'cost'})[0].id,'a','Known zero sorts before unknown');
+assert.equal(payload({structuredContent:{budget:{enabled:false}}},'budget').enabled,false);
+assert.throws(()=>payload({isError:true,structuredContent:{budget:{enabled:true}}},'budget'),'Error responses must not appear successful');
+assert.match(budgetDeliveryLabel({enabled:true,delivery:{status:'pending-model-interaction'}}),/等待/);
+assert.match(budgetDeliveryLabel({enabled:false,delivery:{status:'host-confirmed',hostVerified:true}}),/关闭/);
+assert.match(budgetDeliveryLabel({enabled:true,delivery:{status:'emitted-unverified'}}),/未确认/);
+assert.match(budgetDeliveryLabel({enabled:true,delivery:{status:'host-confirmed',hostVerified:true}}),/已送达/);
+console.log('PASS: unknown amounts, token semantics, filters, sorting, MCP error handling, delivery distinction');
+
+assert.equal(normalizeCost({usageStatus:'unavailable',amountUsd:4.25,total:{requestCount:0,knownUsd:'0',costComplete:false}}).amount,4.25,'Positive observed adapter subtotal cannot be hidden by incomplete status');
+const partial=normalizeTokens({usageStatus:'partial',tokens:{input:null,output:120,total:null},total:{knownTokens:{input:450,output:120,totalTokens:570},requestCount:1}});
+assert.equal(partial.input,450);assert.equal(partial.total,570);assert.equal(partial.partial,true,'Known token subtotal remains visible');
+assert.equal(normalizeTokens({tokens:{output:120},usageStatus:'unavailable'}).output,120,'Known output remains visible despite missing history');
+assert.equal(uniqueDiagnostics(['account_identity_unknown'],[{code:'account_identity_unknown',severity:'warning'},{code:'pricing_incomplete'}]).length,2,'Diagnostics deduplicate across quota and estimate');
+
+assert.equal(normalizeTokens({cacheWrite:null,knownTokens:{cacheWrite:0}}).cacheWrite,null,'A zero-initialized subtotal cannot fill an absent cache-write counter');
+assert.equal(normalizeTokens({cacheWrite:0}).cacheWrite,0,'Explicit measured zero remains zero');

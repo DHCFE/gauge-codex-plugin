@@ -13,7 +13,7 @@
     "plugin/scripts/account_usage.py": "ab01277ef9e15b9432368178709ba663791631d2a20e3b3f8cc79828a3f8e79a",
     "plugin/scripts/agent_usage.py": "3a898adfce29af3879485fff6af6edf27b53df0fa1bffea03a6ae08c8f86feef",
     "plugin/scripts/cost_meter.py": "c8a723e558493c19bf6e46a795425931f994f06c9eec1a35f8ffbbd0e3fded45",
-    "plugin/scripts/live_usage.py": "1139afc3bb3febe0db5e442ecc2fd2d1576f16f69d52ec8698c4f85e4b400f7b",
+    "plugin/scripts/live_usage.py": "06ec764a1495c2d03bd472fc70d3a0cc8b6734b26b29cc49ca7682be86670081",
     "plugin/scripts/usage_dispatch.py": "2f6292e0dde33628437007cacddef895612f094d51f9534509e55582462d8271"
   }
 }

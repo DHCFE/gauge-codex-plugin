@@ -2,15 +2,21 @@
 
 这份说明适用于已经成功安装 Gauge 的用户。第一次使用请看 [从零安装说明](INSTALL.md)。
 
-打开 Gauge 面板，有新版时会出现「更新」按钮。点击后，agent 会帮助升级，保留本地统计和预算数据。你也可以直接让 Codex「帮我把 Gauge 更新到最新版」。
+Gauge 0.5.8 起，打开面板时自动检查新版；顶部也始终提供「检查更新」。手动检查会立即联网，不受自动检查的 6 小时缓存限制。
+
+发现新版后点「一键更新」。面板会显示更新中、失败可重试或已安装。安装器从官方 GitHub Release 下载固定版本安装包并校验 SHA-256，再校验包内文件；保留统计、预算和插件身份，本地安装注册失败时恢复上一份发行文件。Git 安装保持原 Git 来源，固定在旧 tag 的来源需要先调整版本。
+
+安装完成后，请保存工作并完全退出、重新打开客户端，加载新版。Gauge 不会替你关闭客户端。检查更新不会安装；只有点击「一键更新」才会安装。
+
+**0.5.7 及更旧版本**的按钮仍通过 agent 升级，需要先让 Codex「帮我把 Gauge 更新到最新版」一次，即可获得新入口。
 
 ## 给负责更新的 agent
 
 1. 检查现有 `tokenlens-local` 市场来源，保留用户数据和插件身份。
-2. 若来源是本仓库 `DHCFE/gauge-codex-plugin` 的 Git 地址，使用客户端自带 CLI 执行 `codex plugin marketplace upgrade tokenlens-local`，再执行 `codex plugin install tokenlens-prototype@tokenlens-local`，核对版本并保留 Git 来源。
+2. 若来源是本仓库 `DHCFE/gauge-codex-plugin` 的 Git 地址，使用客户端自带 CLI 执行 `codex plugin marketplace upgrade tokenlens-local`，再执行 `codex plugin add tokenlens-prototype@tokenlens-local`，核对版本并保留 Git 来源。
 3. 若来源是本插件的单插件本地目录，下载并阅读 https://raw.githubusercontent.com/DHCFE/gauge-codex-plugin/main/install.sh，然后运行脚本完成升级。不要要求用户先卸载。来源不明或目录中包含其他插件时，不替换该来源。
 4. 检查 Gauge 已安装并启用，再说明版本和重新打开的方法。不要擅自关闭客户端，不修改预算状态。
 
 ## 版本提醒
 
-版本提醒显示在 Gauge 面板中。打开时检查公开版本信息，成功结果在本机缓存 6 小时；只有点击按钮才会请求 agent 升级。原生插件列表的更新标记和无人值守升级尚未验证。
+自动检查成功后缓存 6 小时；「检查更新」始终绕过缓存。检查失败不会显示“已是最新版”，下载失败或校验失败不会替换当前安装。更新只访问公开发行信息与安装包，不上传账号或聊天数据。原生插件列表是否显示更新由宿主决定，此处入口位于 Gauge 面板内。

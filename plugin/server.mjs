@@ -38717,7 +38717,7 @@ function G(B, Q, F, V, q) {
 }
 
 // src/server.mjs
-import { readFileSync as readFileSync3 } from "node:fs";
+import { readFileSync as readFileSync4 } from "node:fs";
 import { createServer as createServer2 } from "node:http";
 
 // src/usage-engine.mjs
@@ -38732,28 +38732,28 @@ async function readTelemetry(operation, request = {}) {
   const body = operation === "thread" ? { operation, thread_id: request.thread_id } : { operation, request };
   const key = JSON.stringify(body);
   if (pending.has(key)) return pending.get(key);
-  const execute = () => new Promise((resolve2, reject) => {
+  const execute2 = () => new Promise((resolve2, reject) => {
     const bundled = existsSync(engine) && !process.env.TOKENLENS_PYTHON;
     const child = spawn(bundled ? fileURLToPath(engine) : process.env.TOKENLENS_PYTHON || "python3", bundled ? [] : [fileURLToPath(script)], {
       stdio: ["pipe", "pipe", "ignore"],
       env: { ...process.env, TOKENLENS_ROOT: fileURLToPath(new URL(".", import.meta.url)) }
     });
     let output2 = "", settled = false;
-    const fail = (message) => {
+    const fail2 = (message) => {
       if (!settled) {
         settled = true;
         child.kill();
         reject(new Error(message));
       }
     };
-    const timer = setTimeout(() => fail("\u8BFB\u53D6\u672C\u5730\u7528\u91CF\u8D85\u65F6\uFF0C\u8BF7\u91CD\u8BD5\u3002"), 45e3);
+    const timer = setTimeout(() => fail2("\u8BFB\u53D6\u672C\u5730\u7528\u91CF\u8D85\u65F6\uFF0C\u8BF7\u91CD\u8BD5\u3002"), 45e3);
     child.stdout.on("data", (chunk) => {
       output2 += chunk;
-      if (output2.length > 32 * 1024 * 1024) fail("\u672C\u5730\u7528\u91CF\u7ED3\u679C\u8FC7\u5927\uFF0C\u8BF7\u7F29\u5C0F\u67E5\u8BE2\u8303\u56F4\u3002");
+      if (output2.length > 32 * 1024 * 1024) fail2("\u672C\u5730\u7528\u91CF\u7ED3\u679C\u8FC7\u5927\uFF0C\u8BF7\u7F29\u5C0F\u67E5\u8BE2\u8303\u56F4\u3002");
     });
     child.on("error", () => {
       clearTimeout(timer);
-      fail("\u672C\u5730\u8BA1\u6570\u5F15\u64CE\u672A\u80FD\u542F\u52A8\uFF0C\u8BF7\u68C0\u67E5\u5B8C\u6574\u8FD0\u884C\u5305\u3002");
+      fail2("\u672C\u5730\u8BA1\u6570\u5F15\u64CE\u672A\u80FD\u542F\u52A8\uFF0C\u8BF7\u68C0\u67E5\u5B8C\u6574\u8FD0\u884C\u5305\u3002");
     });
     child.stdin.on("error", () => {
     });
@@ -38766,12 +38766,12 @@ async function readTelemetry(operation, request = {}) {
         settled = true;
         resolve2(usage);
       } catch (error62) {
-        fail(error62 instanceof SyntaxError ? "\u672C\u5730\u8BA1\u6570\u5F15\u64CE\u6CA1\u6709\u8FD4\u56DE\u6709\u6548 JSON\u3002" : error62.message);
+        fail2(error62 instanceof SyntaxError ? "\u672C\u5730\u8BA1\u6570\u5F15\u64CE\u6CA1\u6709\u8FD4\u56DE\u6709\u6548 JSON\u3002" : error62.message);
       }
     });
     child.stdin.end(JSON.stringify(body));
   });
-  const running = telemetryQueue.then(execute, execute).finally(() => pending.delete(key));
+  const running = telemetryQueue.then(execute2, execute2).finally(() => pending.delete(key));
   telemetryQueue = running.catch(() => {
   });
   pending.set(key, running);
@@ -38829,7 +38829,7 @@ async function readCodexAppServer({
   let id2 = 0, buffer = "", totalBytes = 0, ended = false;
   const deadline = Date.now() + timeoutMs;
   const pending2 = /* @__PURE__ */ new Map();
-  const fail = (code) => {
+  const fail2 = (code) => {
     ended = true;
     for (const waiter of pending2.values()) {
       clearTimeout(waiter.timer);
@@ -38837,13 +38837,13 @@ async function readCodexAppServer({
     }
     pending2.clear();
   };
-  child.on("error", () => fail("provider_launch_failed"));
-  child.on("close", () => fail("provider_closed"));
-  child.stdin.on("error", () => fail("provider_closed"));
+  child.on("error", () => fail2("provider_launch_failed"));
+  child.on("close", () => fail2("provider_closed"));
+  child.stdin.on("error", () => fail2("provider_closed"));
   child.stdout.on("data", (chunk) => {
     totalBytes += Buffer.byteLength(chunk);
     if (totalBytes > 1024 * 1024) {
-      fail("provider_output_limit");
+      fail2("provider_output_limit");
       child.kill("SIGKILL");
       return;
     }
@@ -38857,11 +38857,11 @@ async function readCodexAppServer({
       try {
         message = JSON.parse(line);
       } catch {
-        fail("invalid_provider_payload");
+        fail2("invalid_provider_payload");
         return;
       }
       if (message?.method) {
-        if (message.id !== void 0 && message.method === "account/chatgptAuthTokens/refresh") fail("external_auth_host_required");
+        if (message.id !== void 0 && message.method === "account/chatgptAuthTokens/refresh") fail2("external_auth_host_required");
         continue;
       }
       const waiter = pending2.get(message?.id);
@@ -38885,7 +38885,7 @@ async function readCodexAppServer({
     });
   }
   try {
-    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.7" }, capabilities: { experimentalApi: true } });
+    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.8" }, capabilities: { experimentalApi: true } });
     child.stdin.write(JSON.stringify({ method: "initialized" }) + "\n");
     const auth = await call("account/read", { refreshToken: false });
     if (!auth?.account || auth.account.type !== "chatgpt") return {
@@ -38908,7 +38908,7 @@ async function readCodexAppServer({
       rateLimitsByLimitId: limits?.rateLimitsByLimitId ?? null
     };
   } finally {
-    fail("provider_closed");
+    fail2("provider_closed");
     child.stdin.end();
     if (child.exitCode === null) {
       child.kill("SIGTERM");
@@ -40155,11 +40155,11 @@ function createUpdateService({ repository, currentVersion, dataDir, fetchImpl = 
       installUrl: `https://raw.githubusercontent.com/${repository}/main/INSTALL.md`
     };
   }
-  async function check2() {
+  async function check2({ force = false } = {}) {
     if (!configured) return { status: "unconfigured", currentVersion };
     const cached2 = memory || readCache();
-    if (cached2 && compareVersions(cached2.manifest.version, currentVersion) >= 0 && now() - cached2.checkedAt < 6 * 60 * 6e4) return view(cached2);
-    if (now() - lastFailureAt < 15 * 6e4) return cached2 ? view(cached2, true) : { status: "unavailable", currentVersion };
+    if (!force && cached2 && compareVersions(cached2.manifest.version, currentVersion) >= 0 && now() - cached2.checkedAt < 6 * 60 * 6e4) return view(cached2);
+    if (!force && now() - lastFailureAt < 15 * 6e4) return cached2 ? view(cached2, true) : { status: "unavailable", currentVersion };
     if (pending2) return pending2;
     pending2 = (async () => {
       const controller = new AbortController();
@@ -40191,15 +40191,131 @@ function createUpdateService({ repository, currentVersion, dataDir, fetchImpl = 
     })();
     return pending2;
   }
-  return { check: check2 };
+  return { check: check2, async release(version2) {
+    const status = await check2({ force: true });
+    if (status.status !== "available" || status.stale || status.latestVersion !== version2) throw new Error("\u7248\u672C\u4FE1\u606F\u5DF2\u53D8\u5316\u6216\u6682\u4E0D\u53EF\u7528\uFF0C\u8BF7\u91CD\u65B0\u68C0\u67E5\u66F4\u65B0\u3002");
+    return { ...memory.manifest };
+  } };
+}
+
+// src/release-installer.mjs
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { createHash as createHash4 } from "node:crypto";
+import { existsSync as existsSync2, readFileSync as readFileSync3 } from "node:fs";
+import { mkdtemp, rm, open as open3 } from "node:fs/promises";
+import { tmpdir as tmpdir2 } from "node:os";
+import { join as join6 } from "node:path";
+var execute = promisify(execFile);
+var fail = (message) => {
+  throw new Error(message);
+};
+function createReleaseInstaller({
+  repository,
+  currentVersion,
+  updates: updates2,
+  fetchImpl = fetch,
+  run = (file2, args, options = {}) => execute(file2, args, { env, timeout: 18e4, maxBuffer: 4 * 1024 * 1024, ...options }),
+  platform = process.platform,
+  arch = process.arch,
+  env = process.env
+} = {}) {
+  let pending2, state = { status: "idle" };
+  async function install(version2) {
+    if (pending2) return pending2;
+    if (platform !== "darwin" || arch !== "arm64") fail("\u4E00\u952E\u66F4\u65B0\u76EE\u524D\u652F\u6301 Apple Silicon Mac\u3002");
+    if (!/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$/.test(repository)) fail("\u66F4\u65B0\u6765\u6E90\u65E0\u6548\u3002");
+    if (compareVersions(version2, currentVersion) <= 0) fail("\u8BF7\u9009\u62E9\u6BD4\u5F53\u524D\u7248\u672C\u66F4\u65B0\u7684\u53D1\u884C\u7248\u3002");
+    pending2 = perform(version2).finally(() => {
+      pending2 = null;
+    });
+    return pending2;
+  }
+  async function perform(version2) {
+    const candidates = [
+      env.TOKENLENS_CODEX,
+      ...["/Applications", join6(env.HOME || "", "Applications")].flatMap((root) => ["Codex", "ChatGPT"].map((app) => join6(root, app + ".app/Contents/Resources/codex-cli/bin/codex")))
+    ];
+    const cli = candidates.find((path) => path && existsSync2(path));
+    if (!cli) fail("\u672A\u627E\u5230\u5BA2\u6237\u7AEF\u5185\u7F6E\u5B89\u88C5\u7A0B\u5E8F\uFF0C\u8BF7\u66F4\u65B0 Codex \u5BA2\u6237\u7AEF\u540E\u91CD\u8BD5\u3002");
+    const list = async () => JSON.parse((await run(cli, ["plugin", "marketplace", "list", "--json"])).stdout).marketplaces;
+    const source = (await list()).find((row) => row.name === "tokenlens-local");
+    if (!source?.root) fail("\u672A\u627E\u5230\u73B0\u6709 Gauge \u6765\u6E90\uFF0C\u8BF7\u901A\u8FC7\u5B89\u88C5\u8BF4\u660E\u4FEE\u590D\u3002");
+    const catalog = JSON.parse(readFileSync3(join6(source.root, ".agents/plugins/marketplace.json"), "utf8"));
+    if (catalog.name !== "tokenlens-local" || catalog.plugins?.length !== 1 || catalog.plugins[0].name !== "tokenlens-prototype") fail("\u73B0\u6709\u6765\u6E90\u5305\u542B\u5176\u4ED6\u63D2\u4EF6\uFF0C\u65E0\u6CD5\u81EA\u52A8\u66F4\u65B0\u3002");
+    const manifest = await updates2.release(version2);
+    if (manifest.version !== version2 || manifest.product !== "Gauge" || manifest.platform !== "darwin-arm64" || manifest.asset !== "Gauge-mac-arm64.zip" || !/^[a-f0-9]{64}$/.test(manifest.sha256)) fail("\u53D1\u884C\u4FE1\u606F\u65E0\u6548\u3002");
+    if (source.marketplaceSource?.sourceType === "git") {
+      const origin = (await run("/usr/bin/git", ["-C", source.root, "remote", "get-url", "origin"])).stdout.trim().replace(/\.git$/, "");
+      if (![`https://github.com/${repository}`, `git@github.com:${repository}`].includes(origin)) fail("Git \u6765\u6E90\u4E0E\u5B98\u65B9 Gauge \u4ED3\u5E93\u4E0D\u7B26\u3002");
+      await run(cli, ["plugin", "marketplace", "upgrade", "tokenlens-local"]);
+      const refreshed = (await list()).find((row) => row.name === "tokenlens-local");
+      const actual = JSON.parse(readFileSync3(join6(refreshed.root, "plugin/.codex-plugin/plugin.json"), "utf8"));
+      if (actual.version !== version2) fail("Git \u6765\u6E90\u53EF\u80FD\u56FA\u5B9A\u5728\u65E7\u7248\u672C\uFF0C\u8BF7\u8C03\u6574\u6765\u6E90\u7248\u672C\u540E\u91CD\u8BD5\u3002");
+      await run(cli, ["plugin", "add", "tokenlens-prototype@tokenlens-local"]);
+    } else if (source.marketplaceSource?.sourceType === "local") {
+      const temp = await mkdtemp(join6(tmpdir2(), "gauge-update-"));
+      try {
+        const archive = join6(temp, "Gauge.zip");
+        const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 18e4);
+        const digest2 = createHash4("sha256");
+        try {
+          const response = await fetchImpl(`https://github.com/${repository}/releases/download/v${version2}/${manifest.asset}`, { signal: controller.signal });
+          if (!response.ok || !response.body) fail("\u65B0\u7248\u4E0B\u8F7D\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5\u3002");
+          const file2 = await open3(archive, "wx", 384);
+          try {
+            let size = 0;
+            for await (const bytes of response.body) {
+              size += bytes.byteLength;
+              if (size > 200 * 1024 * 1024) {
+                controller.abort();
+                fail("\u5B89\u88C5\u5305\u8D85\u51FA\u5927\u5C0F\u9650\u5236\u3002");
+              }
+              digest2.update(bytes);
+              await file2.writeFile(bytes);
+            }
+          } finally {
+            await file2.close();
+          }
+        } finally {
+          clearTimeout(timer);
+        }
+        if (digest2.digest("hex") !== manifest.sha256) fail("\u4E0B\u8F7D\u6821\u9A8C\u5931\u8D25\uFF0C\u5F53\u524D\u5B89\u88C5\u672A\u6539\u52A8\uFF0C\u8BF7\u91CD\u8BD5\u3002");
+        const name = `Gauge-${version2}-mac-arm64`;
+        const entries = (await run("/usr/bin/unzip", ["-Z1", archive])).stdout.trim().split("\n");
+        if (!entries.length || entries.some((path) => !path.startsWith(name + "/") || path.includes("\\") || path.split("/").some((part) => part === ".." || part === "."))) fail("\u5B89\u88C5\u5305\u8DEF\u5F84\u65E0\u6548\u3002");
+        await run("/usr/bin/unzip", ["-q", archive, "-d", join6(temp, "unpacked")]);
+        const payload = join6(temp, "unpacked", name);
+        const identity3 = JSON.parse(readFileSync3(join6(payload, "plugin/.codex-plugin/plugin.json"), "utf8"));
+        if (identity3.name !== "tokenlens-prototype" || identity3.interface?.displayName !== "Gauge" || identity3.version !== version2) fail("\u5B89\u88C5\u5305\u8EAB\u4EFD\u4E0D\u5339\u914D\u3002");
+        await run("/bin/bash", [join6(payload, "Update.command")], { env: { ...env, TOKENLENS_CODEX: cli, TOKENLENS_NO_PAUSE: "1" } });
+      } finally {
+        await rm(temp, { recursive: true, force: true });
+      }
+    } else fail("\u6B64\u5B89\u88C5\u6765\u6E90\u6682\u4E0D\u652F\u6301\u4E00\u952E\u66F4\u65B0\uFF0C\u8BF7\u4F7F\u7528\u66F4\u65B0\u8BF4\u660E\u3002");
+    const installed = JSON.parse((await run(cli, ["plugin", "list", "--marketplace", "tokenlens-local", "--json"])).stdout).installed;
+    if (!installed?.some((row) => row.name === "tokenlens-prototype" && row.version === version2 && row.enabled === true)) fail("\u5B89\u88C5\u72B6\u6001\u5C1A\u672A\u786E\u8BA4\uFF0C\u8BF7\u91CD\u8BD5\u6216\u91CD\u65B0\u6253\u5F00\u5BA2\u6237\u7AEF\u68C0\u67E5\u3002");
+    return { status: "installed", version: version2, restartRequired: true };
+  }
+  return { install, status: () => ({ ...state }), start(version2) {
+    if (state.status === "installing" || state.status === "installed" && state.version === version2) return { ...state };
+    state = { status: "installing", version: version2 };
+    void install(version2).then((result) => {
+      state = result;
+    }, () => {
+      state = { status: "failed", version: version2, message: "\u66F4\u65B0\u672A\u5B8C\u6210\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u548C\u5B89\u88C5\u6765\u6E90\u540E\u91CD\u8BD5\u3002\u73B0\u6709\u672C\u5730\u7248\u672C\u5728\u5B89\u88C5\u5931\u8D25\u65F6\u4F1A\u6062\u590D\u3002" };
+    });
+    return { ...state };
+  } };
 }
 
 // src/server.mjs
-var APP_URI = "ui://tokenlens/live-v3-0.5.7.html";
-var icon = readFileSync3(new URL("./assets/icon.svg", import.meta.url), "utf8");
+var APP_URI = "ui://tokenlens/live-v3-0.5.8.html";
+var icon = readFileSync4(new URL("./assets/icon.svg", import.meta.url), "utf8");
 var panelSnapshot = createPanelSnapshot({ dataDir: pluginDataDir() });
-var updateConfig = JSON.parse(readFileSync3(new URL("./data/release.json", import.meta.url), "utf8"));
-var updates = createUpdateService({ ...updateConfig, currentVersion: "0.5.7", dataDir: pluginDataDir() });
+var updateConfig = JSON.parse(readFileSync4(new URL("./data/release.json", import.meta.url), "utf8"));
+var updates = createUpdateService({ ...updateConfig, currentVersion: "0.5.8", dataDir: pluginDataDir() });
+var installer = createReleaseInstaller({ ...updateConfig, currentVersion: "0.5.8", updates });
 var integration = createIntegration({
   readAccount: (request) => readTelemetry("account", request),
   readThread: (thread_id) => readTelemetry("thread", { thread_id }),
@@ -40245,11 +40361,11 @@ function openPanel(args, extra) {
   };
 }
 function createMcpServer() {
-  const server = new McpServer({ name: "tokenlens", title: "Gauge", version: "0.5.7", icons: [{ src: `data:image/svg+xml,${encodeURIComponent(icon)}`, mimeType: "image/svg+xml", sizes: ["any"] }] });
+  const server = new McpServer({ name: "tokenlens", title: "Gauge", version: "0.5.8", icons: [{ src: `data:image/svg+xml,${encodeURIComponent(icon)}`, mimeType: "image/svg+xml", sizes: ["any"] }] });
   G(server, "tokenlens-ui", APP_URI, {}, async () => ({ contents: [{
     uri: APP_URI,
     mimeType: L,
-    text: readFileSync3(new URL("./assets/tokenlens.html", import.meta.url), "utf8").replace("<script>", () => "<script>window.tokenlensSnapshot=" + JSON.stringify(panelSnapshot.read()).replaceAll("<", "\\u003c") + ";"),
+    text: readFileSync4(new URL("./assets/tokenlens.html", import.meta.url), "utf8").replace("<script>", () => "<script>window.tokenlensSnapshot=" + JSON.stringify(panelSnapshot.read()).replaceAll("<", "\\u003c") + ";"),
     _meta: { ui: { prefersBorder: false, csp: { connectDomains: [], resourceDomains: [] } }, "openai/widgetDescription": "Gauge \u672C\u5730\u8F6E\u6B21\u4E0E\u8D26\u53F7\u7EDF\u8BA1\u9762\u677F\u3002\u9884\u7B97\u9ED8\u8BA4\u5173\u95ED\uFF1B\u65E0\u9700\u590D\u8FF0\u754C\u9762\u3002" }
   }] }));
   const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true };
@@ -40343,12 +40459,24 @@ function createMcpServer() {
     "get_update_status",
     {
       title: "\u68C0\u67E5 Gauge \u65B0\u7248",
-      description: "Read public Gauge release metadata with a six-hour local cache; no account or conversation data is sent and no software is installed.",
-      inputSchema: {},
+      description: "Read public release metadata and installation progress. force:true bypasses the six-hour cache. No account or conversation data is sent.",
+      inputSchema: { force: external_exports.boolean().optional() },
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true, idempotentHint: true },
       _meta: appOnly
     },
-    async () => ({ content: [], structuredContent: { updateStatus: await updates.check() } })
+    async (args) => ({ content: [], structuredContent: { updateStatus: { ...await updates.check(args), installation: installer.status() } } })
+  );
+  j(
+    server,
+    "install_update",
+    {
+      title: "\u5B89\u88C5 Gauge \u65B0\u7248",
+      description: "Install the explicitly selected official Gauge release after a user clicks Update. Verify the archive checksum; preserve local usage and budgets. Never close the client.",
+      inputSchema: { version: external_exports.string().regex(/^\d{1,6}\.\d{1,6}\.\d{1,6}$/) },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: true },
+      _meta: appOnly
+    },
+    (args) => ({ content: [], structuredContent: { installation: installer.start(args.version) } })
   );
   return server;
 }

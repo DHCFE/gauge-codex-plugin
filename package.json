@@ -1,0 +1,24 @@
+{
+  "name": "gauge-local-usage",
+  "version": "0.5.8",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node plugin/server.mjs",
+    "test": "python3 -m unittest discover -s tests -v && node --test tests/quota*.mjs tests/panel-snapshot.mjs tests/update-service.mjs tests/release-installer.mjs tests/conversation-cost.mjs && node tests/budget-service.mjs && node tests/budget-hook.mjs && node tests/budget-ledger.mjs && node test.mjs && node tests/integration.mjs && node --test tests/ui-model.mjs",
+    "runtime:mac": "python3 packaging/build_mac.py",
+    "release:mac": "node packaging/release.mjs",
+    "test:release": "node tests/release.mjs",
+    "test:actual": "node tests/integration-actual.mjs",
+    "test:startup": "node tests/ui-startup.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "@modelcontextprotocol/ext-apps": "2.0.3",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

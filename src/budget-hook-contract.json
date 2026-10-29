@@ -1,0 +1,16 @@
+{
+  "status": "adapter-tested-native-host-unverified",
+  "documentation": "https://learn.chatgpt.com/docs/hooks",
+  "commandEntry": "src/budget-hook.mjs (E packages a standalone command)",
+  "adapterEnvironment": "TOKENLENS_BUDGET_ADAPTER: absolute E-owned trusted module exporting async createHookDependencies() => {service,resolveScope}",
+  "events": {
+    "SessionStart": {"matcher": "startup|resume|clear|compact", "purpose": "Restore short current budget after start, resume or compaction"},
+    "UserPromptSubmit": {"purpose": "One short summary per new turn, including final reply costs from the previous turn"},
+    "SubagentStart": {"purpose": "Verified child receives the shared root budget without unrelated conversation data"},
+    "PreToolUse": {"purpose": "Only low/overspent transitions with a reminder cooldown; never blocks/replaces calls"}
+  },
+  "additionalContextLimit": 600,
+  "forbiddenEvents": ["Stop", "SubagentStop", "SessionEnd"],
+  "disabledBehavior": "No stdout or stderr, no additionalContext, no model invocation, no readUsage. No global rules.",
+  "limitations": ["Host plugin hook registration/trust and actual model delivery must be tested by E before claiming AI is informed", "No guarantee of token-level real-time notification or model compliance", "Local deduplicated ledger scope and descendant ownership must be supplied by A/E", "No account ID is inferred from the latest account or working directory"]
+}

@@ -1,0 +1,114 @@
+import assert from 'node:assert/strict';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { resolve, join } from 'node:path';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolveThread } from './src/thread-context.mjs';
+const home=mkdtempSync(join(tmpdir(),'tokenlens-context-'));
+const folder=join(home,'sessions/2026/10/01');mkdirSync(folder,{recursive:true});
+for (const [id,input] of [['chat-a',1000],['chat-b',5000]]) {
+ const usage={input_tokens:input,cached_input_tokens:400,cache_write_input_tokens:0,output_tokens:100,reasoning_output_tokens:0,total_tokens:input+100};
+ const row=(type,payload)=>({timestamp:new Date().toISOString(),type,payload});
+ writeFileSync(join(folder,'rollout-test-'+id+'.jsonl'),[row('session_meta',{id,model_provider:'openai',account_id:'fixture-account',billing_pool_id:'codex'}),row('event_msg',{type:'task_started',turn_id:'turn'}),row('turn_context',{turn_id:'turn',model:'gpt-6.1-sol'}),row('token_usage_record',{thread_id:id,turn_id:'turn',response_id:id+'-response',usage,turn_token_usage:usage,thread_token_usage:usage})].map(x=>JSON.stringify(x)).join('\n')+'\n');
+}
+const env={...process.env,TOKENLENS_PYTHON:process.env.TOKENLENS_PYTHON || 'python3',CODEX_HOME:home,TOKENLENS_DATA:join(home,'data')};
+process.on('exit',()=>rmSync(home,{recursive:true,force:true}));
+assert.equal(resolveThread(undefined,{}),null);
+assert.equal(resolveThread('chosen',{'thread_id':'other'}).id,'chosen');
+assert.equal(resolveThread(undefined,{'x-codex-turn-metadata':JSON.stringify({thread_id:'chat-b'})}).id,'chat-b');
+async function check(client) {
+  const catalog=await client.listTools();
+  assert.deepEqual(catalog.tools.map(t=>t.name),['open_tokenlens','get_usage','get_account_usage','get_account_quota','get_conversation_budget','set_conversation_budget','get_budget_context','get_budget_overview','export_account_usage','get_update_status','install_update']);
+  assert.deepEqual(catalog.tools.at(-1)._meta.ui.visibility,['app']);
+  const open=catalog.tools[0];
+  assert.equal(open._meta.ui.resourceUri,'ui://tokenlens/live-v3-0.5.8.html');
+  assert.deepEqual(open._meta['openai/ui'].entrypoints,[{type:'global'},{type:'thread'}]);
+  const empty=await client.callTool({name:'open_tokenlens',arguments:{}});
+  assert.equal(empty.structuredContent.panelReady,true);
+  assert.equal(empty.structuredContent.threadId,null);
+  assert.equal(empty.isError,undefined);
+  assert.equal(empty._meta.usage,undefined);
+  const first=await client.callTool({name:'open_tokenlens',arguments:{},_meta:{'x-codex-turn-metadata':{thread_id:'chat-a'}}});
+  assert.equal(first.structuredContent.panelReady,true);
+  assert.equal(first._meta.threadContext.threadId,'chat-a');
+  assert.equal(first._meta.usage,undefined,'opening the panel does not require a telemetry read');
+  const firstUsage=await client.callTool({name:'get_usage',arguments:{thread_id:first.structuredContent.threadId}});
+  assert.equal(firstUsage._meta.usage.total.totalTokens,1100);
+  const newborn=await client.callTool({name:'open_tokenlens',arguments:{},_meta:{'openai/threadId':'chat-new'}});
+  assert.equal(newborn.structuredContent.panelReady,true);
+  assert.equal(newborn.isError,undefined);
+  const waiting=await client.callTool({name:'get_usage',arguments:{thread_id:'chat-new'}});
+  assert.equal(waiting.isError,undefined);
+  assert.equal(waiting._meta.usage.usageStatus,'waiting');
+  assert.equal(waiting._meta.usage.total.totalTokens,null);
+  assert.deepEqual(waiting._meta.usage.turns,[],'new conversation must not borrow chat-a or chat-b');
+  const newbornPath=join(folder,'rollout-test-chat-new.jsonl');
+  writeFileSync(newbornPath,readFileSync(join(folder,'rollout-test-chat-a.jsonl'),'utf8').replaceAll('chat-a','chat-new'));
+  assert.equal((await client.callTool({name:'get_usage',arguments:{thread_id:'chat-new'}}))._meta.usage.total.totalTokens,1100);
+  rmSync(newbornPath);
+  const second=await client.callTool({name:'get_usage',arguments:{},_meta:{'openai/threadId':'chat-b'}});
+  assert.equal(second._meta.usage.threadId,'chat-b');
+  assert.equal(second._meta.usage.total.totalTokens,5100);
+  const again=await client.callTool({name:'get_usage',arguments:{},_meta:{'x-codex-turn-metadata':{thread_id:'chat-a'}}});
+  assert.equal(again._meta.usage.total.totalTokens,1100);
+  assert.equal((await client.callTool({name:'get_usage',arguments:{}}))._meta.needsThread,true);
+  const updated=await client.callTool({name:'get_usage',arguments:{thread_id:first.structuredContent.threadId}});
+  assert.equal(updated._meta.usage.threadId,first.structuredContent.threadId);
+  assert.equal((await client.callTool({name:'get_usage',arguments:{thread_id:'../invalid'}})).isError,true);
+  const account=await client.callTool({name:'get_account_usage',arguments:{}});
+  assert.equal(account.structuredContent.accountUsage.threadCount,2);
+  assert.equal(account.structuredContent.accountUsage.conversations.length,2);
+  assert.equal(account._meta.needsThread,undefined,'account access must not require current thread');
+  const off=await client.callTool({name:'get_budget_context',arguments:{},_meta:{'openai/threadId':'chat-a'}});
+  assert.deepEqual(off.content,[]);
+  assert.equal(off.structuredContent.context,'');
+  const budget=await client.callTool({name:'set_conversation_budget',arguments:{enabled:true,amount_usd:1},_meta:{'openai/threadId':'chat-a'}});
+  assert.equal(budget.structuredContent.budget.threadId,'chat-a');
+  assert.equal(budget.structuredContent.budget.enabled,true);
+  assert.equal(budget.structuredContent.budget.delivery.hostVerified,false);
+  const context=await client.callTool({name:'get_budget_context',arguments:{},_meta:{'openai/threadId':'chat-a'}});
+  assert.ok(context.content[0].text.includes('软预算'));
+  assert.equal(context.structuredContent.delivery.status,'emitted-unverified');
+  const isolated=await client.callTool({name:'get_conversation_budget',arguments:{},_meta:{'openai/threadId':'chat-b'}});
+  assert.equal(isolated.structuredContent.budget.enabled,false);
+  await client.callTool({name:'set_conversation_budget',arguments:{enabled:false},_meta:{'openai/threadId':'chat-a'}});
+  assert.deepEqual((await client.callTool({name:'get_budget_context',arguments:{thread_id:'chat-a'}})).content,[]);
+  const exported=await client.callTool({name:'export_account_usage',arguments:{format:'csv',filters:{search:'chat-a'}}});
+  assert.ok(exported.structuredContent.export.content.includes('chat-a'));
+  assert.ok(!exported.structuredContent.export.content.includes('chat-b'));
+  const resource=await client.readResource({uri:open._meta.ui.resourceUri});
+  assert.equal(resource.contents[0].mimeType,'text/html;profile=mcp-app');
+  assert.ok(resource.contents[0].text.includes('ui/initialize'));
+  assert.ok(!resource.contents[0].text.includes('示例聊天'));
+  assert.deepEqual(resource.contents[0]._meta.ui.csp,{connectDomains:[],resourceDomains:[]});
+}
+const stdio=new Client({name:'tokenlens-test',version:'1.0'});
+try {
+  await stdio.connect(new StdioClientTransport({command:process.execPath,args:['./server.mjs'],cwd:resolve('plugin'),env}));
+  await check(stdio);
+  console.log('PASS: stdio initialization, entrypoints, UI resource, real data, validation, CSP');
+} finally { await stdio.close(); }
+const reopened=new Client({name:'tokenlens-reopened-panel',version:'1'});
+try {
+  await reopened.connect(new StdioClientTransport({command:process.execPath,args:['./server.mjs'],cwd:resolve('plugin'),env}));
+  const result=await reopened.callTool({name:'open_tokenlens',arguments:{thread_id:'fresh-unrelated-chat'}});
+  assert.equal(result._meta.panelSnapshot.accountUsage.threadCount,2,'new MCP process reuses global account snapshot without a new scan');
+  assert.equal(result._meta.panelSnapshot.budget,undefined,'snapshot never carries another conversation budget');
+  assert.equal(result._meta.usage,undefined,'account cache does not borrow conversation usage');
+  const uri=(await reopened.listTools()).tools[0]._meta.ui.resourceUri;
+  assert.ok((await reopened.readResource({uri})).contents[0].text.includes('window.tokenlensSnapshot={'),'resource hydrates before bridge startup');
+  console.log('PASS: new process/new conversation loads shared account snapshot before telemetry');
+} finally {await reopened.close();}
+const child=spawn(process.execPath,['./server.mjs','--http'],{cwd:resolve('plugin'),env:{...env,PORT:'49429'},stdio:['ignore','ignore','pipe']});
+const http=new Client({name:'tokenlens-http-test',version:'1.0'});
+try {
+  const ready=await Promise.race([once(child.stderr,'data'),once(child,'exit').then(()=>{throw new Error('HTTP server exited before ready');})]);
+  assert.ok(String(ready[0]).includes('Gauge MCP'));
+  await http.connect(new StreamableHTTPClientTransport(new URL('http://127.0.0.1:49429/mcp')));
+  await check(http);
+  console.log('PASS: streamable HTTP initialization, tools, UI resource');
+} finally { await http.close(); child.kill(); }
