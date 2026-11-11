@@ -25,7 +25,7 @@ async function check(client) {
   assert.deepEqual(catalog.tools.map(t=>t.name),['open_tokenlens','get_usage','get_account_usage','get_account_quota','get_conversation_budget','set_conversation_budget','get_budget_context','get_budget_overview','export_account_usage','get_update_status','install_update']);
   assert.deepEqual(catalog.tools.at(-1)._meta.ui.visibility,['app']);
   const open=catalog.tools[0];
-  assert.equal(open._meta.ui.resourceUri,'ui://tokenlens/live-v3-0.5.8.html');
+  assert.equal(open._meta.ui.resourceUri,'ui://tokenlens/live-v3-0.5.10.html');
   assert.deepEqual(open._meta['openai/ui'].entrypoints,[{type:'global'},{type:'thread'}]);
   const empty=await client.callTool({name:'open_tokenlens',arguments:{}});
   assert.equal(empty.structuredContent.panelReady,true);

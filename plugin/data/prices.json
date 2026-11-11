@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "verified_at": "2026-10-29",
+  "service_tiers_verified_at": "2026-11-11",
   "currency": "USD",
   "unit": "per 1 million tokens",
   "sources": [
@@ -16,7 +17,7 @@
     "gpt-5.6": "gpt-5.6-sol"
   },
   "notes": [
-    "Standard API-equivalent is the default; it is not Codex subscription/credit billing.",
+    "The panel uses the recorded service tier for API-equivalent costs.",
     "Cache reads and writes are disjoint subsets of input; reasoning is included in output.",
     "Long context means more than 272000 input tokens in one request, not in a whole turn.",
     "No fuzzy alias or dated-snapshot matching. Unknown models remain unpriced.",
@@ -24,6 +25,7 @@
   ],
   "models": {
     "gpt-6-astra": {
+      "standard_multipliers": {"ultrafast": "6"},
       "cache_write": true,
       "long_context_threshold": 272000,
       "tiers": {
@@ -148,6 +150,7 @@
       }
     },
     "gpt-6-luna": {
+      "standard_multipliers": {"fast": "2", "flex": "0.5", "batch": "0.5"},
       "cache_write": true,
       "long_context_threshold": 272000,
       "tiers": {
@@ -610,6 +613,7 @@
       }
     },
     "gpt-6.1-sol": {
+      "standard_multipliers": {"fast": "2", "ultrafast": "6", "flex": "0.5", "batch": "0.5"},
       "cache_write": true,
       "long_context_threshold": 272000,
       "tiers": {

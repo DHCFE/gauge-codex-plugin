@@ -44,7 +44,7 @@ try {
     const rows=[{type:'session_meta',payload:{id,model_provider:'openai'}},
       {type:'event_msg',payload:{type:'task_started',turn_id:'turn'}},
       {type:'turn_context',payload:{turn_id:'turn',model:'gpt-6.1-sol'}},
-      {type:'token_usage_record',payload:{thread_id:id,turn_id:'turn',response_id:'response-'+id,usage,turn_token_usage:usage,thread_token_usage:usage}}];
+      {type:'token_usage_record',payload:{thread_id:id,turn_id:'turn',response_id:'response-'+id,service_tier:'default',usage,turn_token_usage:usage,thread_token_usage:usage}}];
     writeFileSync(join(sessionDir,`rollout-test-${id}.jsonl`),rows.map(JSON.stringify).join('\n')+'\n');
   }
   async function verifyInstalled() {
@@ -82,7 +82,7 @@ try {
     const childRows=[{type:'session_meta',payload:{id:'child',session_id:'execution-child',model_provider:'openai',source:{subagent:{thread_spawn:{parent_thread_id:'chat-a'}}}}},
       {type:'turn_context',payload:{turn_id:'child-turn',root_turn_id:'turn',model:'gpt-6.1-sol'}},
       {type:'response_item',payload:{content:'x'.repeat(4*1024*1024+100)}},
-      {type:'token_usage_record',payload:{thread_id:'child',session_id:'execution-child',turn_id:'child-turn',root_turn_id:'turn',response_id:'child-response',usage:childUsage,turn_token_usage:childUsage,thread_token_usage:childUsage}}];
+      {type:'token_usage_record',payload:{thread_id:'child',session_id:'execution-child',turn_id:'child-turn',root_turn_id:'turn',response_id:'child-response',service_tier:'default',usage:childUsage,turn_token_usage:childUsage,thread_token_usage:childUsage}}];
     writeFileSync(childPath,childRows.map(JSON.stringify).join('\n')+'\n');
     const withChild=(await client.callTool({name:'get_usage',arguments:{thread_id:'chat-a'}}))._meta.usage;
     assert.equal(withChild.total.totalTokens,2200,'frozen parser must read usage after an oversized child record');

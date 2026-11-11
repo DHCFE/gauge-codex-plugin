@@ -158,7 +158,7 @@ async function readCodexAppServer({
     });
   }
   try {
-    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.8" }, capabilities: { experimentalApi: true } });
+    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.10" }, capabilities: { experimentalApi: true } });
     child.stdin.write(JSON.stringify({ method: "initialized" }) + "\n");
     const auth = await call("account/read", { refreshToken: false });
     if (!auth?.account || auth.account.type !== "chatgpt") return {
@@ -327,6 +327,7 @@ function accountUsageFromLedger(snapshot, { request } = {}) {
     apiEquivalentUsd: finite(amount) ? amount : null,
     costBasis: snapshot?.pricing?.kind === "API equivalent" && snapshot?.pricing?.currency === "USD" ? "api-equivalent" : null,
     unknownPriceCount: total.unpricedRequests ?? null,
+    estimatedTierRequests: total.estimatedTierRequests ?? null,
     coverage: {
       periodComplete: exactRequest && coverage.timeFilterExact === true && coverage.usageComplete === true && coverage.localScanComplete === true,
       accountComplete: coverage.accountAttributionComplete === true,
@@ -402,12 +403,12 @@ function normalizeUsage(raw, scope, startAt, endAt) {
   if (!raw || raw.accountId !== scope.accountId || raw.rootThreadId !== scope.rootThreadId || raw.scopeVerified !== true) return { ...base, reason: "ledger-scope-unverified" };
   try {
     if (startAt > endAt || iso(raw.startAt) !== startAt || iso(raw.endAt) !== endAt) return { ...base, reason: "ledger-period-mismatch" };
-    const knownUsd = micros(raw.knownUsd) / SCALE;
+    const knownUsd = raw.knownUsd === null ? null : micros(raw.knownUsd) / SCALE;
     const observedAt = iso(raw.observedAt);
     if (observedAt < startAt) return { ...base, reason: "ledger-observation-before-epoch" };
     const unknownCostCount = Number.isSafeInteger(raw.unknownCostCount) && raw.unknownCostCount >= 0 ? raw.unknownCostCount : null;
     const pending2 = typeof raw.pending === "boolean" ? raw.pending : null;
-    const costComplete = raw.costComplete === true && unknownCostCount === 0;
+    const costComplete = knownUsd !== null && raw.costComplete === true && unknownCostCount === 0;
     return {
       knownUsd,
       costComplete,
@@ -839,7 +840,7 @@ function createIntegration({ readAccount, readThread, readQuota, estimateCapacit
       startAt: request.startAt,
       endAt: request.endAt,
       scopeVerified: verified,
-      knownUsd: Number(t.knownUsd),
+      knownUsd: t.requestCount > 0 && t.pricedRequests === 0 ? null : Number(t.knownUsd),
       costComplete: complete && (t.costComplete === true || t.requestCount === 0),
       unknownCostCount: t.unpricedRequests,
       pending: !c.localScanComplete,
@@ -872,6 +873,8 @@ function createIntegration({ readAccount, readThread, readQuota, estimateCapacit
       pricingComplete: t.costComplete === true,
       scanComplete: c.localScanComplete === true,
       unpricedRequests: t.unpricedRequests,
+      estimatedTierRequests: t.estimatedTierRequests,
+      byServiceTier: ledger.byServiceTier,
       coverageComplete: false,
       accountIdentityStatus: ledger.accountStatus,
       qualityReasons: c.issues || []

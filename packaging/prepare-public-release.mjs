@@ -22,7 +22,7 @@ for(const file of ['round-usage.png','conversation-budget.png','budget-setup.png
   copyFileSync(join(root,'docs/images',file),join(output,'docs/images',file));
 }
 // Publish maintainable sources and synthetic tests alongside the installable plugin.
-for (const folder of ['src','web','packaging','tests']) {
+for (const folder of ['src','web','packaging','tests','claude-mod']) {
   rmSync(join(output,folder),{recursive:true,force:true});
   cpSync(join(root,folder),join(output,folder),{recursive:true,filter:path=>!path.includes('__pycache__')&&!path.endsWith('.pyc')&&!/verify-|integration-actual/.test(path)});
 }
@@ -54,4 +54,8 @@ writeFileSync(join(assets,'version.json'),JSON.stringify({product:'Gauge',versio
 copyFileSync(join(output,'install.sh'),join(assets,'install.sh'));
 copyFileSync(join(output,'INSTALL.md'),join(assets,'INSTALL.md'));
 copyFileSync(join(output,'UPDATE.md'),join(assets,'UPDATE.md'));
-console.log('Prepared reviewed public repository and six release assets for Gauge '+version);
+// Keep the Claude marketplace separate from the Codex install payload.
+const claudeArchive=join(assets,'Gauge-Claude-Code-Mod.zip');
+rmSync(claudeArchive,{force:true});
+execFileSync('/usr/bin/zip',['-q','-r','-X',claudeArchive,'claude-mod'],{cwd:output});
+console.log('Prepared reviewed public repository and release assets for Gauge '+version);

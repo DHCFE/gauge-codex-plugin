@@ -9,10 +9,11 @@ import account_usage
 def dispatch(request):
     operation = request.get('operation', 'thread')
     if operation == 'thread':
-        return live_usage.snapshot(request.get('thread_id'))
+        return live_usage.snapshot(request.get('thread_id'), tier='observed')
     if operation == 'account':
         query = dict(request.get('request', {}))
         query.setdefault('pricesFile', str(live_usage.ROOT / 'data/prices.json'))
+        query.setdefault('tier', 'observed')
         return account_usage.snapshot(query)
     raise ValueError('Unsupported telemetry operation')
 

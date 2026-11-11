@@ -10,10 +10,11 @@
   "builtOnMacOS": "15.6.1",
   "signing": "ad-hoc; not notarized",
   "sources": {
-    "plugin/scripts/account_usage.py": "ab01277ef9e15b9432368178709ba663791631d2a20e3b3f8cc79828a3f8e79a",
-    "plugin/scripts/agent_usage.py": "3a898adfce29af3879485fff6af6edf27b53df0fa1bffea03a6ae08c8f86feef",
-    "plugin/scripts/cost_meter.py": "c8a723e558493c19bf6e46a795425931f994f06c9eec1a35f8ffbbd0e3fded45",
-    "plugin/scripts/live_usage.py": "06ec764a1495c2d03bd472fc70d3a0cc8b6734b26b29cc49ca7682be86670081",
-    "plugin/scripts/usage_dispatch.py": "2f6292e0dde33628437007cacddef895612f094d51f9534509e55582462d8271"
+    "plugin/scripts/account_usage.py": "363b1d495989ddf4ecf4263957d10f49cabf793b57973392696d45f49b516ff9",
+    "plugin/scripts/agent_usage.py": "01ccf939b7aa8bad559229750591cbef11bcdac8e19488303ad99f7e3c5f4e28",
+    "plugin/scripts/cost_meter.py": "624816abc1de8e31ffeb748b7e83dcce08541c56bc54c4f6376c4fda797f8e55",
+    "plugin/scripts/live_usage.py": "06d742b98e589429d737ae50dc0f4ccb61755797a34fadd03b57f999cf5234cb",
+    "plugin/scripts/service_tiers.py": "7b2e8b557a99f90cdce83ebb44b320078a80d668911cec32561a600d37dd199e",
+    "plugin/scripts/usage_dispatch.py": "3f3267df1dcd47a59014f357d3ef41d87b04c78bf98caca2a9f1ddd0852bc791"
   }
 }

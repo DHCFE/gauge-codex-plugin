@@ -1,0 +1,14 @@
+{
+  "name": "gauge-claude-local",
+  "owner": {
+    "name": "Gauge"
+  },
+  "plugins": [
+    {
+      "name": "gauge-usage",
+      "source": "./plugins/gauge-claude",
+      "description": "Gauge for Claude Code"
+    }
+  ],
+  "description": "Local Gauge plugins for Claude Code."
+}

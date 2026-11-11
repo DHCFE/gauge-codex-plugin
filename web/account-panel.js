@@ -1,4 +1,5 @@
 import { $, put, reconcile } from './dom.js';
+import { serviceTierLabel } from './conversation-cost.js';
 import {finite,formatNumber as num,formatMoney as money,formatDate as date,list,payload,normalizeConversation,normalizeCost,normalizeTokens,filterConversations,budgetDeliveryLabel,uniqueDiagnostics,formatOverviewMoney as overviewMoney} from './account-model.js';
 const reasonLabels={account_identity_unknown:'账号身份未知',pool_identity_unknown:'计费池身份未知',period_unknown:'官方周期未知',sample_too_small:'官方额度已用比例过小，采样不足',other_device_usage_possible:'可能存在其他设备消耗',source_coverage_incomplete:'数据来源覆盖不完整',account_attribution_incomplete:'账号归属不完整',pricing_incomplete:'价格缺失或费用未完整计价',weekly_window_unavailable:'未发现明确的官方周额度窗口',weekly_pool_ambiguous:'存在多个周额度池，请明确选择',quota_outside_current_period:'额度数据不在当前官方周期',model_mix_and_rate_weights_may_change:'模型组合与额度权重可能变化',api_equivalent_extrapolation:'按 API 等价费用外推容量',account_identity_mismatch:'账号不一致',pool_identity_mismatch:'计费池不一致',quota_stale:'官方额度数据已过期',usage_stale:'本地费用数据已过期',usage_period_mismatch:'费用与官方周期不一致'};
 Object.assign(reasonLabels,{other_device_usage_unreconciled:'其他设备消耗尚未核对',account_coverage_incomplete:'账号归属覆盖不完整',pool_coverage_incomplete:'计费池归属覆盖不完整',period_coverage_incomplete:'官方周期内费用记录不完整',observation_stale:'额度或费用数据已过期',ledger_period_mismatch:'费用与官方周期不一致',ledger_quota_not_synchronized:'费用与额度采集时间未对齐',cycle_cost_unknown:'本周期累计费用未知',cost_basis_unverified:'API 等价计价依据未确认',pricing_completeness_unverified:'费用完整计价尚未确认',quota_unavailable:'官方额度暂不可读',observation_time_unknown:'采集时间未知',positive_quota_without_recorded_cost:'官方已记录消耗，但本地未发现对应费用','account-attribution-unknown':'部分记录的账号归属未知','time-attribution-incomplete':'部分记录无法精确归入时间区间','legacy-lineage-unresolved':'部分旧记录的继承历史归属待确认','records-pending':'部分记录尚未落盘完整','scan-deferred':'本次扫描达到上限，将在后续读取继续','native-total-gap':'部分请求明细缺失','parent-transcript-missing':'已知主对话缺少本地记录','conflicting-session-metadata':'对话归属记录有冲突','missing-local-transcript':'本地对话记录缺失','nonlocal-or-missing-transcript':'非本地或缺少记录的对话','index-discovery-incomplete':'会话索引发现未完成','thread-index-unavailable':'会话索引暂不可读'});
@@ -93,9 +94,12 @@ export function createAccountPanel({callTool,getThread,onSelectThread}) {
       const tokenValue=row?.tokens??row?.knownTokens?.totalTokens;
       const tokens=finite(tokenValue);
       const partial=row?.costComplete===false||row?.scanComplete===false;
-      put(metric+'Cost',(amount!==null&&partial?'≥ ':'')+overviewMoney(amount));put(metric+'Tokens',tokens===null?'':(partial?'≥ ':'')+num(tokens)+' Tokens');
+      put(metric+'Cost',(amount!==null&&partial&&!row?.estimatedTierRequests?'≥ ':'')+overviewMoney(amount));put(metric+'Tokens',tokens===null?'':(partial?'≥ ':'')+num(tokens)+' Tokens');
     }
     renderCost('today',today);renderCost('window',current);renderCost('month',month);
+    const tiers=list(current?.byServiceTier).filter(row=>row.id && row.pricedRequests>0);
+    const tierSummary=tiers.map(row=>serviceTierLabel(row.id)+' '+overviewMoney(row.observedUsd));
+    put('windowPricing',tierSummary.join(' · '));
   }
 
   function renderQuota(){
@@ -113,7 +117,8 @@ export function createAccountPanel({callTool,getThread,onSelectThread}) {
     const costSource=quota.costs;
     const diagnostics=uniqueDiagnostics(quota.warnings,quota.qualityReasons,estimate?.warnings,estimate?.reasons,estimate?.qualityReasons,costSource?.warnings,costSource?.qualityReasons,costSource?.currentWindow?.qualityReasons);
     const blockers=diagnostics.filter(item=>typeof item==='object'&&item.severity==='blocker');
-    put('quotaWarnings',capacity===null&&blockers.length?warnings(blockers.slice(0,1)):'');
+    const smallSample=diagnostics.find(item=>(item?.code??item)==='sample_too_small');
+    put('quotaWarnings',capacity===null&&blockers.length?warnings(blockers.slice(0,1)):capacity!==null&&smallSample?warnings([smallSample]):'');
     const pools=list(quota.pools);$('quotaPoolDetails').hidden=!pools.length;
     reconcile($('quotaPools'),pools.flatMap((pool,i)=>list(pool.windows).length?pool.windows.map((window,j)=>({...window,id:String(pool.poolId??pool.id??i)+'-'+j,name:pool.name??pool.poolId??pool.id})): [{...pool,id:String(pool.id??pool.limitId??i)}]),()=>{const el=document.createElement('p');return el;},(el,pool)=>{el.textContent=(pool.name??pool.id??'额度池')+(pool.windowDurationMins?' · '+(pool.windowDurationMins===10080?'周窗口':pool.windowDurationMins+' 分钟窗口'):'')+' · '+(finite(pool.usedPercent)===null?'比例未知':pool.usedPercent+'% 已用')+' · '+(pool.resetsAt?date(pool.resetsAt)+' 重置':'周期未知');});
     renderRecentCosts();renderBudgetPreview();renderUpdatedAt();
@@ -126,7 +131,7 @@ export function createAccountPanel({callTool,getThread,onSelectThread}) {
     if(!snapshot){
       account=null;quota=null;estimate=null;quotaFresh=false;lastRead=0;rows=[];selected=null;
       ['todayCost','windowCost','monthCost','weeklyUsed','weeklyCapacity','accountCost','accountTokens'].forEach(id=>put(id,'—'));
-      ['todayTokens','windowTokens','monthTokens','weeklyRemaining','weeklyReset','accountStatus','quotaWarnings'].forEach(id=>put(id,''));
+      ['todayTokens','windowTokens','windowPricing','monthTokens','weeklyRemaining','weeklyReset','accountStatus','quotaWarnings'].forEach(id=>put(id,''));
       $('quotaMeter').hidden=true;$('quotaPoolDetails').hidden=true;$('accountInspector').hidden=true;
       ['quotaPools','modelSources','tokenSources','agentSources','projectSummary','daySummary','dayChart'].forEach(id=>$(id).replaceChildren());
       setOptions('accountModel',[],'全部模型');setOptions('accountProject',[],'全部项目');renderRows();return;

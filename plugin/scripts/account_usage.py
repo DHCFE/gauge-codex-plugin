@@ -25,6 +25,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import cost_meter as m
+import service_tiers
 from agent_usage import lineage
 
 REVISION = 4
@@ -107,6 +108,7 @@ def record(state, row, raw, key, source, known=True, ownership='owned', **extra)
            'accountId': identity(p) or state['accountId'] or meta['accountId'],
            'accountEvidence': 'request-telemetry' if identity(p) else state.get('accountEvidence') or meta.get('accountEvidence', 'account-telemetry' if meta['accountId'] else 'not-recorded'), 'billingPoolId': m.label(p.get('billing_pool_id')) or m.label(p.get('rate_limit_id')) or state['billingPoolId'] or meta['billingPoolId'],
            'billingMode': m.label(p.get('billing_mode')) or state['billingMode'] or meta['billingMode'],
+           'recordedServiceTier': service_tiers.request_tier(p),
            'requestKnown': known, 'cacheWriteKnown': 'cache_write_input_tokens' in raw,
            'reasoningKnown': 'reasoning_output_tokens' in raw, 'timeRangeKnown': known,
            **extra}
@@ -358,12 +360,15 @@ def scan_file(path, db, allowance, deadline, force=False):
                         if json.loads(old[0]) != rec:
                             # Late duplicates sometimes acquire a new timestamp.
                             prior = json.loads(old[0])
+                            tier = service_tiers.merge((prior.get('recordedServiceTier'), rec.get('recordedServiceTier')))
                             if any(prior.get(k) != rec.get(k) for k in ('usage', 'model', 'provider', 'accountId', 'billingPoolId', 'turnId', 'rootTurnId')):
                                 note(state, 'conflicting-request-record')
                                 # A conflicted request is quarantined in every
                                 # consumer, including the live sidebar.
                                 prior['ownership'] = 'unresolved'
                                 prior['conflict'] = True
+                            if tier != prior.get('recordedServiceTier') or prior.get('conflict'):
+                                prior['recordedServiceTier'] = tier
                                 db.execute('UPDATE account_records SET record=? WHERE path=? AND id=?',
                                            (json.dumps(prior), str(path), rec['id']))
                         continue
@@ -526,6 +531,7 @@ def canonical(db, paths=None, include_inherited=True):
     for copies in candidates.values():
         rec = copies[0]
         rec['sourceCopies'] = len(copies)
+        rec['recordedServiceTier'] = service_tiers.merge(c.get('recordedServiceTier') for c in copies)
         if rec.get('conflict') or any(any(c.get(k) != rec.get(k) for k in ('usage', 'model', 'provider', 'accountId', 'billingPoolId', 'ownership', 'timeRangeKnown', 'turnId', 'rootTurnId')) for c in copies[1:]):
             rec['conflict'] = True
             rec['accountId'] = None
@@ -677,7 +683,8 @@ def merge_index(home, threads, conversation_id=None):
 
 def price_record(rec, prices):
     seg = {'usage': rec['usage'], 'model': rec['model'], 'provider': rec['provider'],
-           'request_known': rec['requestKnown'], 'cache_write_known': rec['cacheWriteKnown']}
+           'request_known': rec['requestKnown'], 'cache_write_known': rec['cacheWriteKnown'],
+           'service_tier': rec.get('serviceTier')}
     parts, reason = prices.cost_parts(seg)
     if rec['conflict']:
         parts, reason = None, 'Conflicting request telemetry'
@@ -687,6 +694,7 @@ def price_record(rec, prices):
     rec['amount'] = m.money(sum(parts.values(), Decimal(0))) if parts is not None else None
     rec['knownUsd'] = rec['amount'] if rec['amount'] is not None else '0'
     rec['costReason'] = reason
+    rec['estimatedServiceTier'] = prices.tier == 'observed' and rec.get('serviceTierSource') in ('nearby-turn-estimate', 'standard-estimate') and bool(rec['usage']['total_tokens'])
     rec['costParts'] = {k: m.money(v) for k, v in parts.items()} if parts is not None else None
     u = rec['usage']
     rec['tokens'] = {'input': u['input_tokens'] - u['cached_input_tokens'] - u['cache_write_input_tokens'] if rec['cacheWriteKnown'] else None,
@@ -720,6 +728,7 @@ def summary(rows):
     return {**tokens, 'knownTokens': known_tokens, 'requestCount': len(rows),
             'amount': m.money(known) if complete else None, 'knownUsd': m.money(known),
             'costComplete': complete, 'unpricedRequests': unpriced, 'pricedRequests': priced_count,
+            'estimatedTierRequests': sum(r.get('estimatedServiceTier', False) for r in rows),
             'observedUsd': m.money(known) if priced_count else None, 'amountStatus': amount_status,
             'unpricedTokens': sum(r['tokens']['totalTokens'] for r in rows if not r['costComplete']),
             'costParts': {k: m.money(v) for k, v in amounts.items()}}
@@ -787,6 +796,8 @@ def snapshot(request=None, home=None, data_dir=None):
     else:
         index_stats, index_issues = merge_index(home, threads)
         issues.extend(index_issues)
+    if prices.tier == 'observed':
+        service_tiers.apply(records, home, data_dir)
     records = [price_record(r, prices) for r in records]
     bounded = start is not None or end is not None
     uncertain_time = [r for r in records if r['ownership'] == 'owned' and (r['timestamp'] is None or not r['timeRangeKnown'])]
@@ -901,7 +912,8 @@ def snapshot(request=None, home=None, data_dir=None):
                      'label':'本地已观测 API 等价费用', 'amountStatus':all_rows['amountStatus']},
            'unattributed': {'account': summary(unknown_accounts), 'time': summary(uncertain_time),
                             'ownership': summary(unresolved)},
-           'byModel': groups(selected, 'model'), 'byProject': groups(selected, 'project'),
+           'byModel': groups(selected, 'model'), 'byServiceTier': groups(selected, 'serviceTier') if prices.tier == 'observed' else [],
+           'byProject': groups(selected, 'project'),
            'byDay': groups(day_rows, 'day'), 'byAgent': groups(selected, 'agentSource'),
            'byAccount': groups(selected, 'accountId'), 'byBillingPool': groups(selected, 'billingPoolId'), 'byBillingMode': groups(selected, 'billingMode'),
            'byConversation': groups(selected, 'conversationId'),
@@ -919,7 +931,7 @@ def snapshot(request=None, home=None, data_dir=None):
                 'timeUnattributedRecords': uncertain_time if request.get('includeUnresolved') else []}}
         else:
             stream = io.StringIO(newline='')
-            fields = ('id', 'threadId', 'conversationId', 'turnId', 'timestamp', 'accountId', 'billingPoolId', 'model', 'project', 'isSubagent', 'ownership', 'amount', 'costReason', 'input', 'cacheRead', 'cacheWrite', 'output', 'reasoning', 'totalTokens')
+            fields = ('id', 'threadId', 'conversationId', 'turnId', 'timestamp', 'accountId', 'billingPoolId', 'model', 'serviceTier', 'serviceTierSource', 'project', 'isSubagent', 'ownership', 'amount', 'costReason', 'input', 'cacheRead', 'cacheWrite', 'output', 'reasoning', 'totalTokens')
             writer = csv.DictWriter(stream, fieldnames=fields)
             writer.writeheader()
             for r in selected:

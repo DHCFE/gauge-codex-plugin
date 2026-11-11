@@ -12,12 +12,12 @@ import { readQuotaSnapshot, estimateWeeklyCapacity } from './quota-service.mjs';
 import { createUpdateService } from './update-service.mjs';
 import { createReleaseInstaller } from './release-installer.mjs';
 
-const APP_URI = 'ui://tokenlens/live-v3-0.5.8.html';
+const APP_URI = 'ui://tokenlens/live-v3-0.5.10.html';
 const icon = readFileSync(new URL('./assets/icon.svg', import.meta.url), 'utf8');
-const panelSnapshot = createPanelSnapshot({ dataDir: pluginDataDir() });
+const panelSnapshot = createPanelSnapshot({ dataDir: pluginDataDir(), version: 3 });
 const updateConfig = JSON.parse(readFileSync(new URL('./data/release.json', import.meta.url), 'utf8'));
-const updates = createUpdateService({ ...updateConfig, currentVersion:'0.5.8', dataDir:pluginDataDir() });
-const installer = createReleaseInstaller({...updateConfig,currentVersion:'0.5.8',updates});
+const updates = createUpdateService({ ...updateConfig, currentVersion:'0.5.10', dataDir:pluginDataDir() });
+const installer = createReleaseInstaller({...updateConfig,currentVersion:'0.5.10',updates});
 const integration = createIntegration({readAccount:request=>readTelemetry('account',request),readThread:thread_id=>readTelemetry('thread',{thread_id}),
   readQuota:()=>readQuotaSnapshot(),estimateCapacity:estimateWeeklyCapacity,quotaIdentity:panelSnapshot.token});
 const id = z.string().min(1).max(200);
@@ -31,7 +31,7 @@ async function scopedResult(args, extra) {
   const selected = requestThread(args,extra);
   if (!selected) return needsThreadResult();
   const usage = await integration.readThread(selected.id);
-  return {content:[{type:'text',text:'Gauge 已连接本地真实用量。金额为 Standard API 等价。'}],
+  return {content:[{type:'text',text:'Gauge 已连接本地用量。金额以 API 等价费用显示。'}],
     structuredContent:{live:true,threadId:usage.threadId,title:usage.title},_meta:{usage,contextSource:selected.source}};
 }
 function openPanel(args, extra) {
@@ -41,7 +41,7 @@ function openPanel(args, extra) {
     _meta:{ui:{resourceUri:APP_URI},threadContext:{threadId:selected?.id ?? null,source:selected?.source ?? null},panelSnapshot:panelSnapshot.read()}};
 }
 function createMcpServer() {
-  const server = new McpServer({name:'tokenlens',title:'Gauge',version:'0.5.8',icons:[{src:`data:image/svg+xml,${encodeURIComponent(icon)}`,mimeType:'image/svg+xml',sizes:['any']}]});
+  const server = new McpServer({name:'tokenlens',title:'Gauge',version:'0.5.10',icons:[{src:`data:image/svg+xml,${encodeURIComponent(icon)}`,mimeType:'image/svg+xml',sizes:['any']}]});
   registerAppResource(server,'tokenlens-ui',APP_URI,{},async()=>({contents:[{uri:APP_URI,mimeType:RESOURCE_MIME_TYPE,
     text:readFileSync(new URL('./assets/tokenlens.html',import.meta.url),'utf8').replace('<script>',()=>'<script>window.tokenlensSnapshot='+JSON.stringify(panelSnapshot.read()).replaceAll('<','\\u003c')+';'),
     _meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[]}},'openai/widgetDescription':'Gauge 本地轮次与账号统计面板。预算默认关闭；无需复述界面。'}}]}));
@@ -50,7 +50,7 @@ function createMcpServer() {
   const tool = (name,title,description,inputSchema,callback,options={}) => registerAppTool(server,name,{title,description,inputSchema,
     annotations:options.write ? {readOnlyHint:false,destructiveHint:false,openWorldHint:false,idempotentHint:false} : readOnly,
     _meta:options.meta || appOnly},callback);
-  tool('open_tokenlens','Gauge','Open Gauge, including in a new conversation before usage records exist. Current conversation comes from request metadata; explicit thread_id selects a conversation. Costs are Standard API equivalents.',threadSchema,
+  tool('open_tokenlens','Gauge','Open Gauge, including before usage records exist. Current conversation comes from request metadata; explicit thread_id selects a conversation. API-equivalent costs use recorded request tiers.',threadSchema,
     openPanel,{meta:{ui:{resourceUri:APP_URI,visibility:['model','app']},'openai/ui':{entrypoints:[{type:'global'},{type:'thread'}]},'openai/toolInvocation/invoking':'打开 Gauge','openai/toolInvocation/invoked':'Gauge 已打开'}});
   tool('get_usage','刷新真实用量','Read current or explicitly selected thread and verified descendants; no model invocation.',threadSchema,scopedResult);
   tool('get_account_usage','账号明细','Read discoverable local conversations and deduplicated account analytics; current thread is not required.',accountSchema,

@@ -34,9 +34,9 @@ npm run test:release
 
 `runtime:mac` 校验官方 Node 22.23.3 下载摘要，用锁定的 PyInstaller 6.22.3 构建只读计数引擎，收集许可证，并把打包器符号链接转换为普通文件以兼容客户端缓存。Node 压缩存放，插件第一次启动时校验并解压到自己的私有数据目录；不联网或搜索系统运行时。每次启动校验已解压 Node，损坏时从包内重建。所有运行时文件低于 GitHub 单文件 100 MiB 限制，无需 Git LFS。
 
-`release:mac` 每次从当前 `web/` 和 `src/` 构建，校验内置引擎对应当前三份 Python 源码，仅打包明确清单与运行时。产物在 `dist/`，附 ZIP SHA-256 与内部逐文件 SHA-256。ZIP 的哈希用于完整性检查，不替代发布者签名。修改 Python 统计代码后必须重新执行 `runtime:mac`。`test:release` 在隔离用户目录测试实际安装器和随包运行时，不读取真实用户会话。
+`release:mac` 每次从当前 `web/` 和 `src/` 构建，校验内置引擎对应当前 Python 统计源码，仅打包明确清单与运行时。产物在 `dist/`，附 ZIP SHA-256 与内部逐文件 SHA-256。ZIP 的哈希用于完整性检查，不替代发布者签名。修改 Python 统计代码后必须重新执行 `runtime:mac`。`test:release` 在隔离用户目录测试实际安装器和随包运行时，不读取真实用户会话。
 
-后续发布：构建并完成 [发行验收](../RELEASE-ACCEPTANCE.md) 后运行 `node packaging/prepare-public-release.mjs`，提交 `.build/public-repository` 的发行文件和版本 tag，再将 `dist/public-assets/` 中的六个文件（含首次安装与更新说明）上传到同一正式 Release。保留固定资产名 Gauge-mac-arm64.zip 和 version.json，才能让安装链接与新版检查继续生效。第三方许可随包保留；本次由用户授权公开发行，不另行指定 Gauge 源代码许可证。若之后需要 Apple Developer ID 签名/公证，另需 Apple 的发布者账号。
+后续发布：构建并完成 [发行验收](../RELEASE-ACCEPTANCE.md) 后运行 `node packaging/prepare-public-release.mjs`，提交 `.build/public-repository` 的发行文件和版本 tag，再将 `dist/public-assets/` 中的发行资产（含首次安装与更新说明及独立的 Claude Code Mod）上传到同一正式 Release。保留固定资产名 Gauge-mac-arm64.zip 和 version.json，才能让安装链接与新版检查继续生效。第三方许可随包保留；本次由用户授权公开发行，不另行指定 Gauge 源代码许可证。若之后需要 Apple Developer ID 签名/公证，另需 Apple 的发布者账号。
 
 运行时参考：[Node 22.23.3](https://nodejs.org/en/blog/release/v22.23.3)、[PyInstaller macOS 签名](https://pyinstaller.org/en/stable/feature-notes.html#macos-binary-code-signing)。
 

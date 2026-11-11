@@ -1,6 +1,6 @@
 {
   "name": "tokenlens-prototype",
-  "version": "0.5.8",
+  "version": "0.5.10",
   "description": "Local Codex usage, account analytics and opt-in conversation budgets; default budgets disabled.",
   "mcpServers": "./.mcp.json",
   "interface": {

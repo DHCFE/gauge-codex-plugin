@@ -1,6 +1,11 @@
-# Gauge · Codex Mac 侧边栏插件
+# Gauge · 本地用量面板
 
-Gauge 运行在 **Codex Mac 桌面端的侧边栏**，让你边聊天，边看这段对话花了多少 API 等价费用，并为当前对话设置预算。
+Gauge 有两个独立安装的版本。
+
+- **Codex Mac 版**在 Codex 侧边栏显示逐轮用量、账号统计和可选预算。安装方式见下文。
+- **Claude Code Mod**在 Claude Mac App 的 Code 标签中提供原生面板，显示逐轮费用、账号用量和官方额度。[Claude Code 安装说明](https://github.com/DHCFE/gauge-codex-plugin/tree/main/claude-mod) · [下载 Claude Code Mod](https://github.com/DHCFE/gauge-codex-plugin/releases/latest/download/Gauge-Claude-Code-Mod.zip)
+
+## Codex Mac 版
 
 核心功能：
 

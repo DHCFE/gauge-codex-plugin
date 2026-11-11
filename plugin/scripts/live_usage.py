@@ -8,6 +8,7 @@ import time
 from contextlib import closing
 import cost_meter as meter
 import agent_usage as agents
+import service_tiers
 
 ROOT = Path(os.environ.get('TOKENLENS_ROOT', Path(__file__).resolve().parents[1]))
 
@@ -24,6 +25,7 @@ def view(item, key, title, status=None):
             'usd': [known('input'), known('cached_input')+known('cache_write'), known('output')],
             'amount': float(item['usd']) if item.get('usd') is not None else None,
             'costComplete': item.get('cost_complete',False), 'pricedTokens': item.get('priced_tokens',0),
+            'serviceTiers': item.get('service_tiers',[]),
             'model': ' / '.join(item.get('models',[])) or '未记录模型',
             'status': status or item.get('status','observed'), 'source': item.get('source'),
             'warnings': item.get('warnings',[])}
@@ -47,7 +49,7 @@ def waiting(sid,title):
     return {'live':True,'usageStatus':'waiting','threadId':sid,'title':title,'turns':[],
             'total':total,'observedAt':int(time.time()*1000),'warnings':[]}
 
-def snapshot(sid=None,home=None,data_dir=None):
+def snapshot(sid=None,home=None,data_dir=None,tier='standard'):
     home=Path(home or os.environ.get('CODEX_HOME',Path.home()/'.codex')).resolve()
     data_dir=Path(data_dir or os.environ.get('TOKENLENS_DATA',home/'plugins/data/tokenlens-local/tokenlens-prototype'))
     if not sid:raise ValueError('请先指定要统计的对话；不会自动选择其他正在运行的聊天。')
@@ -60,12 +62,14 @@ def snapshot(sid=None,home=None,data_dir=None):
     try:path.stat()
     except FileNotFoundError:return waiting(sid,title)
     data_dir.mkdir(parents=True,exist_ok=True,mode=0o700)
-    prices=meter.Prices(ROOT/'data/prices.json')
+    prices=meter.Prices(ROOT/'data/prices.json',tier=tier)
     observed=agents.collect(sid,path,home,data_dir)
     order=observed['turns']
     if not order:return waiting(sid,title)
     tid=observed['current'] or order[-1]
     records=[r for r in observed['records'] if r['ownership']=='owned']
+    if tier == 'observed':
+        service_tiers.apply(records, home, data_dir)
     child=[r for r in records if r['threadId']!=sid]
     unattributed=[r for r in child if r['rootTurnId'] not in order]
     def summarize(rows,complete=True):

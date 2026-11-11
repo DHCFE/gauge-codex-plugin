@@ -7,8 +7,8 @@ const digest = value => createHash('sha256').update(value).digest('hex');
 const day = value => new Date(value).toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' });
 
 // The snapshot is shared by panel instances and MCP processes, never by conversations.
-export function createPanelSnapshot({ dataDir, codexHome = process.env.CODEX_HOME || join(homedir(), '.codex'), now = Date.now }) {
-  const file = join(dataDir, 'panel-snapshot-v1.json'), lock = file + '.lock';
+export function createPanelSnapshot({ dataDir, codexHome = process.env.CODEX_HOME || join(homedir(), '.codex'), now = Date.now, version = 1 }) {
+  const file = join(dataDir, `panel-snapshot-v${version}.json`), lock = file + '.lock';
   function identity() {
     try {
       const raw = readFileSync(join(codexHome, 'auth.json'), 'utf8'), auth = JSON.parse(raw);
@@ -19,7 +19,7 @@ export function createPanelSnapshot({ dataDir, codexHome = process.env.CODEX_HOM
     try {
       if (statSync(file).size > 16 * 1024 * 1024) return null;
       const snapshot = JSON.parse(readFileSync(file, 'utf8'));
-      if (!identity() || snapshot.identity !== identity() || snapshot.schema !== 1 || !Number.isFinite(snapshot.savedAt) || now() - snapshot.savedAt > 7 * 86400000 || snapshot.savedAt > now()) return null;
+      if (!identity() || snapshot.identity !== identity() || snapshot.schema !== version || !Number.isFinite(snapshot.savedAt) || now() - snapshot.savedAt > 7 * 86400000 || snapshot.savedAt > now()) return null;
       return snapshot;
     } catch { return null; }
   }
@@ -61,7 +61,7 @@ export function createPanelSnapshot({ dataDir, codexHome = process.env.CODEX_HOM
           }
         }
         if (fd === undefined || token !== identity()) return;
-        const snapshot = load() || { schema: 1, identity: token, revisions: {} };
+        const snapshot = load() || { schema: version, identity: token, revisions: {} };
         if ((snapshot.revisions?.[key] || 0) > startedAt) return;
         const stored = { ...value };
         if (key === 'quota') delete stored.cycleUsage;

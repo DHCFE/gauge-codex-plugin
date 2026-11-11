@@ -38885,7 +38885,7 @@ async function readCodexAppServer({
     });
   }
   try {
-    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.8" }, capabilities: { experimentalApi: true } });
+    await call("initialize", { clientInfo: { name: "tokenlens-quota", version: "0.5.10" }, capabilities: { experimentalApi: true } });
     child.stdin.write(JSON.stringify({ method: "initialized" }) + "\n");
     const auth = await call("account/read", { refreshToken: false });
     if (!auth?.account || auth.account.type !== "chatgpt") return {
@@ -39199,6 +39199,7 @@ function estimateWeeklyCapacity({
   if (!finite(weekly.usedPercent) || weekly.usedPercent < 0 || weekly.usedPercent > 100) add("used_percent_unknown");
   else if (weekly.usedPercent === 0) add("used_percent_zero");
   else if (weekly.usedPercent < minUsedPercent) add("sample_too_small", "warning");
+  if (accountUsage?.estimatedTierRequests > 0) add("service_tier_estimated", "warning");
   if (accountUsage?.costBasis !== "api-equivalent") add("cost_basis_unverified");
   if (!finite(accountUsage?.apiEquivalentUsd) || accountUsage.apiEquivalentUsd < 0) add("cycle_cost_unknown");
   else if (accountUsage.apiEquivalentUsd === 0 && weekly.usedPercent > 0) add("positive_quota_without_recorded_cost");
@@ -39216,7 +39217,7 @@ function estimateWeeklyCapacity({
   }
   result.status = "estimated";
   result.reliability = result.qualityReasons.length ? "limited" : "qualified";
-  result.isLowerBound = coverage.periodComplete !== true || coverage.pricingComplete !== true;
+  result.isLowerBound = !(accountUsage.estimatedTierRequests > 0) && (coverage.periodComplete !== true || coverage.pricingComplete !== true);
   result.estimatedCapacityUsd = Math.round(capacity * 100) / 100;
   result.estimatedRemainingUsd = Math.round(capacity * (1 - weekly.usedPercent / 100) * 100) / 100;
   add("api_equivalent_extrapolation", "warning");
@@ -39287,6 +39288,7 @@ function accountUsageFromLedger(snapshot, { request } = {}) {
     apiEquivalentUsd: finite(amount) ? amount : null,
     costBasis: snapshot?.pricing?.kind === "API equivalent" && snapshot?.pricing?.currency === "USD" ? "api-equivalent" : null,
     unknownPriceCount: total.unpricedRequests ?? null,
+    estimatedTierRequests: total.estimatedTierRequests ?? null,
     coverage: {
       periodComplete: exactRequest && coverage.timeFilterExact === true && coverage.usageComplete === true && coverage.localScanComplete === true,
       accountComplete: coverage.accountAttributionComplete === true,
@@ -39362,12 +39364,12 @@ function normalizeUsage(raw, scope, startAt, endAt) {
   if (!raw || raw.accountId !== scope.accountId || raw.rootThreadId !== scope.rootThreadId || raw.scopeVerified !== true) return { ...base, reason: "ledger-scope-unverified" };
   try {
     if (startAt > endAt || iso2(raw.startAt) !== startAt || iso2(raw.endAt) !== endAt) return { ...base, reason: "ledger-period-mismatch" };
-    const knownUsd = micros(raw.knownUsd) / SCALE;
+    const knownUsd = raw.knownUsd === null ? null : micros(raw.knownUsd) / SCALE;
     const observedAt = iso2(raw.observedAt);
     if (observedAt < startAt) return { ...base, reason: "ledger-observation-before-epoch" };
     const unknownCostCount = Number.isSafeInteger(raw.unknownCostCount) && raw.unknownCostCount >= 0 ? raw.unknownCostCount : null;
     const pending2 = typeof raw.pending === "boolean" ? raw.pending : null;
-    const costComplete = raw.costComplete === true && unknownCostCount === 0;
+    const costComplete = knownUsd !== null && raw.costComplete === true && unknownCostCount === 0;
     return {
       knownUsd,
       costComplete,
@@ -39799,7 +39801,7 @@ function createIntegration({ readAccount, readThread, readQuota, estimateCapacit
       startAt: request.startAt,
       endAt: request.endAt,
       scopeVerified: verified,
-      knownUsd: Number(t.knownUsd),
+      knownUsd: t.requestCount > 0 && t.pricedRequests === 0 ? null : Number(t.knownUsd),
       costComplete: complete && (t.costComplete === true || t.requestCount === 0),
       unknownCostCount: t.unpricedRequests,
       pending: !c.localScanComplete,
@@ -39832,6 +39834,8 @@ function createIntegration({ readAccount, readThread, readQuota, estimateCapacit
       pricingComplete: t.costComplete === true,
       scanComplete: c.localScanComplete === true,
       unpricedRequests: t.unpricedRequests,
+      estimatedTierRequests: t.estimatedTierRequests,
+      byServiceTier: ledger.byServiceTier,
       coverageComplete: false,
       accountIdentityStatus: ledger.accountStatus,
       qualityReasons: c.issues || []
@@ -39996,8 +40000,8 @@ import { homedir as homedir2 } from "node:os";
 import { createHash as createHash3, randomUUID as randomUUID2 } from "node:crypto";
 var digest = (value) => createHash3("sha256").update(value).digest("hex");
 var day = (value) => new Date(value).toLocaleDateString("sv-SE", { timeZone: "Asia/Shanghai" });
-function createPanelSnapshot({ dataDir, codexHome = process.env.CODEX_HOME || join4(homedir2(), ".codex"), now = Date.now }) {
-  const file2 = join4(dataDir, "panel-snapshot-v1.json"), lock = file2 + ".lock";
+function createPanelSnapshot({ dataDir, codexHome = process.env.CODEX_HOME || join4(homedir2(), ".codex"), now = Date.now, version: version2 = 1 }) {
+  const file2 = join4(dataDir, `panel-snapshot-v${version2}.json`), lock = file2 + ".lock";
   function identity3() {
     try {
       const raw = readFileSync(join4(codexHome, "auth.json"), "utf8"), auth = JSON.parse(raw);
@@ -40010,7 +40014,7 @@ function createPanelSnapshot({ dataDir, codexHome = process.env.CODEX_HOME || jo
     try {
       if (statSync(file2).size > 16 * 1024 * 1024) return null;
       const snapshot = JSON.parse(readFileSync(file2, "utf8"));
-      if (!identity3() || snapshot.identity !== identity3() || snapshot.schema !== 1 || !Number.isFinite(snapshot.savedAt) || now() - snapshot.savedAt > 7 * 864e5 || snapshot.savedAt > now()) return null;
+      if (!identity3() || snapshot.identity !== identity3() || snapshot.schema !== version2 || !Number.isFinite(snapshot.savedAt) || now() - snapshot.savedAt > 7 * 864e5 || snapshot.savedAt > now()) return null;
       return snapshot;
     } catch {
       return null;
@@ -40059,7 +40063,7 @@ function createPanelSnapshot({ dataDir, codexHome = process.env.CODEX_HOME || jo
           }
         }
         if (fd === void 0 || token !== identity3()) return;
-        const snapshot = load() || { schema: 1, identity: token, revisions: {} };
+        const snapshot = load() || { schema: version2, identity: token, revisions: {} };
         if ((snapshot.revisions?.[key] || 0) > startedAt) return;
         const stored = { ...value };
         if (key === "quota") delete stored.cycleUsage;
@@ -40310,12 +40314,12 @@ function createReleaseInstaller({
 }
 
 // src/server.mjs
-var APP_URI = "ui://tokenlens/live-v3-0.5.8.html";
+var APP_URI = "ui://tokenlens/live-v3-0.5.10.html";
 var icon = readFileSync4(new URL("./assets/icon.svg", import.meta.url), "utf8");
-var panelSnapshot = createPanelSnapshot({ dataDir: pluginDataDir() });
+var panelSnapshot = createPanelSnapshot({ dataDir: pluginDataDir(), version: 3 });
 var updateConfig = JSON.parse(readFileSync4(new URL("./data/release.json", import.meta.url), "utf8"));
-var updates = createUpdateService({ ...updateConfig, currentVersion: "0.5.8", dataDir: pluginDataDir() });
-var installer = createReleaseInstaller({ ...updateConfig, currentVersion: "0.5.8", updates });
+var updates = createUpdateService({ ...updateConfig, currentVersion: "0.5.10", dataDir: pluginDataDir() });
+var installer = createReleaseInstaller({ ...updateConfig, currentVersion: "0.5.10", updates });
 var integration = createIntegration({
   readAccount: (request) => readTelemetry("account", request),
   readThread: (thread_id) => readTelemetry("thread", { thread_id }),
@@ -40347,7 +40351,7 @@ async function scopedResult(args, extra) {
   if (!selected) return needsThreadResult();
   const usage = await integration.readThread(selected.id);
   return {
-    content: [{ type: "text", text: "Gauge \u5DF2\u8FDE\u63A5\u672C\u5730\u771F\u5B9E\u7528\u91CF\u3002\u91D1\u989D\u4E3A Standard API \u7B49\u4EF7\u3002" }],
+    content: [{ type: "text", text: "Gauge \u5DF2\u8FDE\u63A5\u672C\u5730\u7528\u91CF\u3002\u91D1\u989D\u4EE5 API \u7B49\u4EF7\u8D39\u7528\u663E\u793A\u3002" }],
     structuredContent: { live: true, threadId: usage.threadId, title: usage.title },
     _meta: { usage, contextSource: selected.source }
   };
@@ -40361,7 +40365,7 @@ function openPanel(args, extra) {
   };
 }
 function createMcpServer() {
-  const server = new McpServer({ name: "tokenlens", title: "Gauge", version: "0.5.8", icons: [{ src: `data:image/svg+xml,${encodeURIComponent(icon)}`, mimeType: "image/svg+xml", sizes: ["any"] }] });
+  const server = new McpServer({ name: "tokenlens", title: "Gauge", version: "0.5.10", icons: [{ src: `data:image/svg+xml,${encodeURIComponent(icon)}`, mimeType: "image/svg+xml", sizes: ["any"] }] });
   G(server, "tokenlens-ui", APP_URI, {}, async () => ({ contents: [{
     uri: APP_URI,
     mimeType: L,
@@ -40380,7 +40384,7 @@ function createMcpServer() {
   tool(
     "open_tokenlens",
     "Gauge",
-    "Open Gauge, including in a new conversation before usage records exist. Current conversation comes from request metadata; explicit thread_id selects a conversation. Costs are Standard API equivalents.",
+    "Open Gauge, including before usage records exist. Current conversation comes from request metadata; explicit thread_id selects a conversation. API-equivalent costs use recorded request tiers.",
     threadSchema,
     openPanel,
     { meta: { ui: { resourceUri: APP_URI, visibility: ["model", "app"] }, "openai/ui": { entrypoints: [{ type: "global" }, { type: "thread" }] }, "openai/toolInvocation/invoking": "\u6253\u5F00 Gauge", "openai/toolInvocation/invoked": "Gauge \u5DF2\u6253\u5F00" } }

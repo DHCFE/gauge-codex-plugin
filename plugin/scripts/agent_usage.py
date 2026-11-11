@@ -257,4 +257,5 @@ def collect(sid, path, home, data, force_rescan=False):
 
 def request_entry(rec):
     return {'segment': {'usage': rec['usage'], 'model': rec['model'], 'provider': rec['provider'],
-                        'request_known': rec['requestKnown'], 'cache_write_known': rec['cacheWriteKnown']}}
+                        'request_known': rec['requestKnown'], 'cache_write_known': rec['cacheWriteKnown'],
+                        'service_tier': rec.get('serviceTier')}}

@@ -271,7 +271,7 @@ class Prices:
     def __init__(self, path=None, aliases=None, tier="standard"):
         self.data = json.loads(Path(path or ROOT / "data/prices.json").read_text(encoding="utf-8"))
         self.tier = tier
-        if tier not in ("standard", "fast", "flex", "batch"):
+        if tier not in ("standard", "fast", "ultrafast", "flex", "batch", "observed"):
             raise MeterError("Unsupported pricing tier.")
         self.aliases = dict(self.data.get("aliases", {}))
         self.aliases.update(aliases or {})
@@ -280,6 +280,9 @@ class Prices:
             raise MeterError("Model aliases must map to an explicit price-table model.")
         # Validate the entire table, including user-supplied rates, before using it.
         for model in self.data["models"].values():
+            for factor in model.get("standard_multipliers", {}).values():
+                if not Decimal(factor).is_finite() or Decimal(factor) <= 0:
+                    raise MeterError("Price multipliers must be finite and positive.")
             for rates in model["tiers"].values():
                 for context in rates.values():
                     for amount in context.values():
@@ -301,7 +304,14 @@ class Prices:
             return None, "Missing per-request boundaries."
         if model.get("cache_write") and not seg["cache_write_known"]:
             return None, "Cache-write count is missing for this model."
-        tier = model["tiers"].get(self.tier)
+        requested = seg.get("service_tier") if self.tier == "observed" else self.tier
+        if requested is None:
+            return None, "Service tier is unknown for this request."
+        tier = model["tiers"].get(requested)
+        multiplier = Decimal(1)
+        if not tier and requested in model.get("standard_multipliers", {}):
+            tier = model["tiers"]["standard"]
+            multiplier = Decimal(model["standard_multipliers"][requested])
         if not tier:
             return None, "Pricing tier unavailable for this model."
         threshold = model.get("long_context_threshold")
@@ -318,7 +328,7 @@ class Prices:
                 rate = rates.get(key)
                 if rate is None:
                     return None, "A required token rate is unavailable."
-                amounts[key] = Decimal(tokens) * Decimal(str(rate)) / Decimal(1_000_000)
+                amounts[key] = Decimal(tokens) * Decimal(str(rate)) * multiplier / Decimal(1_000_000)
         return amounts, None
 
     def cost(self, seg):
@@ -368,6 +378,7 @@ def summarize_turn(t, prices):
     complete = t["seen_usage"] and observed == total and priced == total and not source_warnings
     cost = sum(amounts.values(), Decimal(0))
     writes_known = all(s["cache_write_known"] for s in segments)
+    tiers = {s.get("service_tier") or "unknown" for s in segments} if prices.tier == "observed" else set()
     return {"usage": total if t["seen_usage"] else None,
             "source": "native-turn-usage" if t["native_total"] else "cumulative-delta",
             "usd": money(cost) if complete else None, "known_usd": money(cost),
@@ -376,7 +387,7 @@ def summarize_turn(t, prices):
                                              complete, writes_known or complete),
             "status": t["status"], "models": sorted({s["model"] for s in segments if s["model"]}),
             "reasoning_efforts": t["efforts"],
-            "cache_write_complete": writes_known,
+            "cache_write_complete": writes_known, "service_tiers": sorted(tiers),
             "warnings": list(dict.fromkeys(notes))}
 
 

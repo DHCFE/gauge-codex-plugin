@@ -57,13 +57,13 @@ function normalizeUsage(raw, scope, startAt, endAt) {
   if (!raw || raw.accountId !== scope.accountId || raw.rootThreadId !== scope.rootThreadId || raw.scopeVerified !== true) return { ...base, reason: 'ledger-scope-unverified' };
   try {
     if (startAt > endAt || iso(raw.startAt) !== startAt || iso(raw.endAt) !== endAt) return { ...base, reason: 'ledger-period-mismatch' };
-    const knownUsd = micros(raw.knownUsd) / SCALE;
+    const knownUsd = raw.knownUsd === null ? null : micros(raw.knownUsd) / SCALE;
     const observedAt = iso(raw.observedAt);
     // A scans asynchronously: observedAt may be after the requested exclusive end.
     if (observedAt < startAt) return { ...base, reason: 'ledger-observation-before-epoch' };
     const unknownCostCount = Number.isSafeInteger(raw.unknownCostCount) && raw.unknownCostCount >= 0 ? raw.unknownCostCount : null;
     const pending = typeof raw.pending === 'boolean' ? raw.pending : null;
-    const costComplete = raw.costComplete === true && unknownCostCount === 0;
+    const costComplete = knownUsd !== null && raw.costComplete === true && unknownCostCount === 0;
     return { knownUsd, costComplete, unknownCostCount, pending, observedAt,
       status: costComplete ? 'observed' : 'partial', reason: costComplete ? null : 'unpriced-or-incomplete-ledger' };
   } catch { return { ...base, reason: 'invalid-ledger-observation' }; }

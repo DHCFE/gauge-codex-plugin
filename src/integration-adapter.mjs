@@ -99,7 +99,7 @@ export function createIntegration({ readAccount, readThread, readQuota, estimate
     const verified = c.localScanComplete === true && c.conflictingRequests === 0;
     const complete = c.usageComplete === true && c.timeFilterExact === true && c.ownershipUnresolvedRequests === 0;
     return {accountId:request.accountId,rootThreadId:request.threadId,startAt:request.startAt,endAt:request.endAt,
-      scopeVerified:verified,knownUsd:Number(t.knownUsd),costComplete:complete && (t.costComplete === true || t.requestCount === 0),
+      scopeVerified:verified,knownUsd:t.requestCount > 0 && t.pricedRequests === 0 ? null : Number(t.knownUsd),costComplete:complete && (t.costComplete === true || t.requestCount === 0),
       unknownCostCount:t.unpricedRequests,pending:!c.localScanComplete,observedAt:new Date(ledger.observedAt).toISOString()};
   }
   const budgets = createBudgetService({dataDir,readUsage:readBudgetUsage,resolveLineage,now});
@@ -116,6 +116,7 @@ export function createIntegration({ readAccount, readThread, readQuota, estimate
       period:ledger.period || period,updatedAt:ledger.observedAt,source:'codex-local-ledger',sourceLabel:'Gauge · Codex 本地记录',
       scope:'discoverable-local-telemetry',precision:c.timeFilterExact?'exact-observed-records':'partial-time-attribution',
       costComplete,pricingComplete:t.costComplete === true,scanComplete:c.localScanComplete === true,unpricedRequests:t.unpricedRequests,
+      estimatedTierRequests:t.estimatedTierRequests,byServiceTier:ledger.byServiceTier,
       coverageComplete:false,accountIdentityStatus:ledger.accountStatus,qualityReasons:c.issues || []};
   }
   async function quota(args = {}) {

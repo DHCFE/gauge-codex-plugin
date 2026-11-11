@@ -2,8 +2,8 @@ import { App } from '@modelcontextprotocol/ext-apps';
 import { $, reconcile } from './dom.js';
 import { createRoundPicker } from './round-picker.js';
 import { createAccountPanel } from './account-panel.js';
-import { costState, conversationAmount, pricingReason } from './conversation-cost.js';
-const app = new App({ name: 'Gauge', version: '0.5.8' }, {}, { autoResize: true });
+import { costState, conversationAmount, pricingReason, serviceTierLabel } from './conversation-cost.js';
+const app = new App({ name: 'Gauge', version: '0.5.10' }, {}, { autoResize: true });
 const num = value => value===null||value===undefined ? '—' : Number(value).toLocaleString('en-US');
 const money = value => value===null||value===undefined ? '—' : '$' + Number(value).toFixed(4);
 const sum = values => values.reduce((a,b) => a+b, 0);
@@ -163,7 +163,7 @@ function render() {
   $('amount').classList.toggle('unpriced',state==='unpriced');
   $('amount').innerHTML=t.pending?'—':state==='unpriced'?'未计价':'<small>'+(t.costComplete?'$':'≥ $')+'</small>'+Number(t.costComplete?t.amount:total).toFixed(4);
   $('tokens').textContent=num(t.totalTokens)+' tokens'+(scope==='total'?'':' · '+statusText(t));
-  $('model').textContent=t.model;
+  $('model').textContent=[t.model,t.serviceTiers?.map(serviceTierLabel).join(' / ')].filter(Boolean).join(' · ');
   $('costBar').innerHTML=t.usd.map(v=>'<i style="flex:'+v/(total||1)+'"></i>').join('');
   $('breakdown').innerHTML=['未缓存输入','缓存'+(hit?' · '+hit.toFixed(1)+'% 命中':''),'输出'].map((label,i)=>'<div class="part"><i class="dot" style="background:'+['var(--input)','var(--cache)','var(--output)'][i]+'"></i><div><p>'+label+'</p><small class="mono">'+num([t.input,t.cached,t.output][i])+' tokens'+(i===1&&t.cacheWrite?' · 写入 '+num(t.cacheWrite):i===2&&t.reasoning?' · 含推理 '+num(t.reasoning):'')+'</small></div><span class="money mono">'+(state==='unpriced'?'未计价':(t.costComplete?'':'≥ ')+money(t.usd[i]))+'</span></div>').join('');
   reconcile($('turnList'),[...data.turns].reverse(),()=>{
@@ -231,7 +231,7 @@ $('nextTurn').onclick=()=>{const i=data?.turns.findIndex(t=>t.id===selectedId);i
 $('latestTurn').onclick=()=>setTab('turn');
 $('explain').onclick=async()=>{
   const t=current();if(!connected||!t)return;
-  try { await app.sendMessage({role:'user',content:[{type:'text',text:'请简短解释 Gauge 所选对话「'+data.title+'」'+t.title+'的实际已记录用量：'+JSON.stringify({input:t.input,cacheRead:t.cacheRead,cacheWrite:t.cacheWrite,output:t.output,reasoningIncluded:t.reasoning,usdParts:t.usd,costComplete:t.costComplete,model:t.model,observedAt:data.observedAt})+'。这是 Standard API 等价，不是订阅扣费。'}]});notice('已发送到当前聊天。'); }
+  try { await app.sendMessage({role:'user',content:[{type:'text',text:'请简短解释 Gauge 所选对话「'+data.title+'」'+t.title+'的实际已记录用量：'+JSON.stringify({input:t.input,cacheRead:t.cacheRead,cacheWrite:t.cacheWrite,output:t.output,reasoningIncluded:t.reasoning,usdParts:t.usd,costComplete:t.costComplete,model:t.model,serviceTiers:t.serviceTiers,observedAt:data.observedAt})+'。金额以 API 等价费用显示。'}]});notice('已发送到当前聊天。'); }
   catch { notice('当前入口暂不支持发消息，统计仍正常更新。'); }
 };
 $('expand').onclick=async()=>{if(!connected)return;try{const r=await app.requestDisplayMode({mode:full?'inline':'fullscreen'});full=r.mode==='fullscreen';}catch{notice('当前入口不支持切换显示模式。');}};

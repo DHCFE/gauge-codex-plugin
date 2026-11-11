@@ -16,7 +16,7 @@ const nextVersion=version.split('.').map((n,i)=>i===2?Number(n)+1:n).join('.');
 writeFileSync(join(data,'release-status.json'),JSON.stringify({repository:'DHCFE/gauge-codex-plugin',checkedAt:Date.now(),manifest:{product:'Gauge',platform:'darwin-arm64',version:nextVersion,asset:'Gauge-mac-arm64.zip',sha256:'a'.repeat(64)}}));
 function record(id,input=1000,model='gpt-6.1-sol'){
   const usage={input_tokens:input,cached_input_tokens:0,cache_write_input_tokens:0,output_tokens:10,reasoning_output_tokens:0,total_tokens:input+10};
-  const rows=[{type:'session_meta',payload:{id,model_provider:'openai'}},{type:'event_msg',payload:{type:'task_started',turn_id:'turn'}},{type:'turn_context',payload:{turn_id:'turn',model}},{type:'token_usage_record',payload:{thread_id:id,turn_id:'turn',response_id:id+'-response',usage,turn_token_usage:usage,thread_token_usage:usage}}];
+  const rows=[{type:'session_meta',payload:{id,model_provider:'openai'}},{type:'event_msg',payload:{type:'task_started',turn_id:'turn'}},{type:'turn_context',payload:{turn_id:'turn',model}},{type:'token_usage_record',payload:{thread_id:id,turn_id:'turn',response_id:id+'-response',service_tier:'default',usage,turn_token_usage:usage,thread_token_usage:usage}}];
   writeFileSync(join(folder,'rollout-test-'+id+'.jsonl'),rows.map(row=>JSON.stringify({timestamp:new Date().toISOString(),...row})).join('\n')+'\n');
 }
 record('older-chat');
@@ -104,7 +104,7 @@ try {
   const childRows=[{type:'session_meta',payload:{id:'child',model_provider:'openai',source:{subagent:{thread_spawn:{parent_thread_id:'older-chat'}}}}},
     {type:'turn_context',payload:{turn_id:'child-t',root_turn_id:'turn',model:'gpt-6.1-sol'}},
     {type:'response_item',payload:{content:'x'.repeat(4*1024*1024+100)}},
-    {type:'token_usage_record',payload:{thread_id:'child',turn_id:'child-t',root_turn_id:'turn',response_id:'child-response',usage:childUsage,turn_token_usage:childUsage,thread_token_usage:childUsage}}];
+    {type:'token_usage_record',payload:{thread_id:'child',turn_id:'child-t',root_turn_id:'turn',response_id:'child-response',service_tier:'default',usage:childUsage,turn_token_usage:childUsage,thread_token_usage:childUsage}}];
   writeFileSync(childPath,childRows.map(JSON.stringify).join('\n')+'\n');
   await page.evaluate(()=>window.openPanel('older-chat'));
   await frame.locator('#tokens').filter({hasText:'2,020 tokens'}).waitFor({timeout:10000});

@@ -1,0 +1,8 @@
+{
+  "name": "gauge-usage",
+  "version": "0.2.2",
+  "description": "Gauge for Claude Code. Native per-turn token and API-equivalent cost, local history, and Claude subscription limits.",
+  "author": {
+    "name": "Gauge"
+  }
+}

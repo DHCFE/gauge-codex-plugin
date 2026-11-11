@@ -174,6 +174,7 @@ export function estimateWeeklyCapacity({ accountUsage, quota, poolId, now = Date
   if (!finite(weekly.usedPercent) || weekly.usedPercent < 0 || weekly.usedPercent > 100) add('used_percent_unknown');
   else if (weekly.usedPercent === 0) add('used_percent_zero');
   else if (weekly.usedPercent < minUsedPercent) add('sample_too_small', 'warning');
+  if (accountUsage?.estimatedTierRequests > 0) add('service_tier_estimated', 'warning');
   if (accountUsage?.costBasis !== 'api-equivalent') add('cost_basis_unverified');
   if (!finite(accountUsage?.apiEquivalentUsd) || accountUsage.apiEquivalentUsd < 0) add('cycle_cost_unknown');
   else if (accountUsage.apiEquivalentUsd === 0 && weekly.usedPercent > 0) add('positive_quota_without_recorded_cost');
@@ -188,7 +189,7 @@ export function estimateWeeklyCapacity({ accountUsage, quota, poolId, now = Date
   if (!Number.isFinite(capacity)) { add('estimate_overflow'); return result; }
   result.status = 'estimated';
   result.reliability = result.qualityReasons.length ? 'limited' : 'qualified';
-  result.isLowerBound = coverage.periodComplete !== true || coverage.pricingComplete !== true;
+  result.isLowerBound = !(accountUsage.estimatedTierRequests > 0) && (coverage.periodComplete !== true || coverage.pricingComplete !== true);
   // Dollar cents are display precision only; this is an extrapolation, never an official balance.
   result.estimatedCapacityUsd = Math.round(capacity * 100) / 100;
   result.estimatedRemainingUsd = Math.round(capacity * (1 - weekly.usedPercent / 100) * 100) / 100;
@@ -250,6 +251,7 @@ export function accountUsageFromLedger(snapshot, { request } = {}) {
     updatedAt: snapshot?.observedAt ?? null, apiEquivalentUsd: finite(amount) ? amount : null,
     costBasis: snapshot?.pricing?.kind === 'API equivalent' && snapshot?.pricing?.currency === 'USD' ? 'api-equivalent' : null,
     unknownPriceCount: total.unpricedRequests ?? null,
+    estimatedTierRequests: total.estimatedTierRequests ?? null,
     coverage: {
       periodComplete: exactRequest && coverage.timeFilterExact === true && coverage.usageComplete === true && coverage.localScanComplete === true,
       accountComplete: coverage.accountAttributionComplete === true,
